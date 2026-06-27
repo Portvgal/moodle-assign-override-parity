@@ -134,6 +134,18 @@ index 16508b28c98..a7933a9bcb1 100644
              $getgroupoverride($userid),
              $getuseroverride($userid)
          );
+@@ -4679,10 +4680,7 @@ class assign {
+             $jsparams['removesubmission'] = has_capability('mod/assign:editothersubmission', $this->context);
+             $jsparams['extend'] = $this->get_instance()->duedate && has_capability('mod/assign:grantextension', $this->context);
+ 
+-            $multipleattemptsallowed = $this->get_instance()->maxattempts > 1
+-                || $this->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS;
+-            $jsparams['grantattempt'] =
+-                $multipleattemptsallowed && $this->get_instance()->attemptreopenmethod == ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL;
++            $jsparams['grantattempt'] = $this->has_bulk_grant_attempt_available($users);
+ 
+             $jsparams['pluginoperations'] = [];
+             foreach ($this->get_feedback_plugins() as $plugin) {
 @@ -8063,27 +8064,29 @@ class assign {
          }
  
@@ -180,6 +192,36 @@ index 16508b28c98..a7933a9bcb1 100644
          $maxattemptsreached = !empty($submission) &&
                                $submission->attemptnumber >= ($instance->maxattempts - 1) &&
                                $instance->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS;
+@@ -9034,6 +9038,29 @@ class assign {
+         return $result;
+     }
+ 
++    /**
++     * Check whether the bulk grant attempt action should be available for the listed users.
++     *
++     * @param array $useridlist Array of userids visible in the grading table.
++     * @return bool
++     */
++    protected function has_bulk_grant_attempt_available(array $useridlist): bool {
++        foreach ($useridlist as $userid) {
++            $this->update_effective_access($userid);
++            $instance = $this->get_instance($userid);
++
++            if ($instance->attemptreopenmethod != ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL) {
++                continue;
++            }
++
++            if ($instance->maxattempts > 1 || $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS) {
++                return true;
++            }
++        }
++
++        return false;
++    }
++
+     /**
+      * Check for a sess key and then call add_attempt.
+      *
 @@ -9075,13 +9079,15 @@ class assign {
       */
      protected function add_attempt($userid) {
@@ -361,11 +403,26 @@ index 776fb557527..84a8ec89a23 100644
      And I click on "Delete" "link"
      And I press "Continue"
      And I should not see "Sam1 Student1"
+diff --git a/mod/assign/tests/fixtures/testable_assign.php b/mod/assign/tests/fixtures/testable_assign.php
+index 3c6e4d2be75..d7057c5f3a2 100644
+--- a/mod/assign/tests/fixtures/testable_assign.php
++++ b/mod/assign/tests/fixtures/testable_assign.php
+@@ -61,6 +61,10 @@ class mod_assign_testable_assign extends assign {
+         return parent::process_add_attempt($userid);
+     }
+ 
++    public function testable_has_bulk_grant_attempt_available(array $useridlist): bool {
++        return parent::has_bulk_grant_attempt_available($useridlist);
++    }
++
+     public function testable_process_save_quick_grades($postdata) {
+         // Ugly hack to get something into the method.
+         global $_POST;
 diff --git a/mod/assign/tests/locallib_test.php b/mod/assign/tests/locallib_test.php
 index f0e1b8d7eba..b81cd5bb8f2 100644
 --- a/mod/assign/tests/locallib_test.php
 +++ b/mod/assign/tests/locallib_test.php
-@@ -2667,6 +2667,142 @@ final class locallib_test extends \advanced_testcase {
+@@ -2667,6 +2667,219 @@ final class locallib_test extends \advanced_testcase {
          $this->assertEmpty($grades);
      }
  
@@ -492,6 +549,83 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
 +    }
 +
 +    /**
++     * Test that the bulk grant attempt action is available when a group override allows extra attempts.
++     */
++    public function test_group_override_maxattempts_allows_bulk_grant_attempt_action(): void {
++        global $DB;
++
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++        $otherstudent = $this->getDataGenerator()->create_and_enrol($course, 'student');
++        $group = $this->getDataGenerator()->create_group(['courseid' => $course->id]);
++        groups_add_member($group, $student);
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL,
++            'maxattempts' => 1,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++
++        $this->assertFalse($assign->testable_has_bulk_grant_attempt_available([$student->id, $otherstudent->id]));
++
++        $DB->insert_record('assign_overrides', (object) [
++            'assignid' => $assign->get_instance()->id,
++            'groupid' => $group->id,
++            'sortorder' => 1,
++            'maxattempts' => 3,
++        ]);
++
++        $this->assertTrue($assign->testable_has_bulk_grant_attempt_available([$student->id, $otherstudent->id]));
++        $this->assertFalse($assign->testable_has_bulk_grant_attempt_available([$otherstudent->id]));
++    }
++
++    /**
++     * Test that the bulk grant attempt action is unavailable when no override allows extra attempts.
++     */
++    public function test_bulk_grant_attempt_action_unavailable_without_extra_attempts(): void {
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL,
++            'maxattempts' => 1,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++
++        $this->assertFalse($assign->testable_has_bulk_grant_attempt_available([$student->id]));
++    }
++
++    /**
++     * Test that an attempts override does not expose bulk grant attempt unless reopening is manual.
++     */
++    public function test_bulk_grant_attempt_action_unavailable_when_reopening_is_not_manual(): void {
++        global $DB;
++
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_NONE,
++            'maxattempts' => 1,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++
++        $DB->insert_record('assign_overrides', (object) [
++            'assignid' => $assign->get_instance()->id,
++            'userid' => $student->id,
++            'maxattempts' => 3,
++        ]);
++
++        $this->assertFalse($assign->testable_has_bulk_grant_attempt_available([$student->id]));
++    }
++
++    /**
 +     * Create, submit, and grade one assignment attempt.
 +     *
 +     * @param \stdClass $student The student user.
@@ -508,7 +642,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
      /**
       * Test reopen behavior when in "Reopen until pass" mode.
       */
-@@ -3851,6 +3987,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+@@ -3851,6 +4064,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 2,
                  'cutoffdate' => 3,
                  'timelimit' => null,
@@ -516,7 +650,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
              ],
              (object) [
                  // Override for group 2, lower priority (numerically higher sortorder).
-@@ -3862,6 +3999,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+@@ -3862,6 +4076,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 6,
                  'cutoffdate' => 6,
                  'timelimit' => null,
@@ -524,7 +658,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
              ],
              (object) [
                  // User override.
-@@ -3873,6 +4011,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+@@ -3873,6 +4088,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 8,
                  'cutoffdate' => 9,
                  'timelimit' => null,
@@ -532,7 +666,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
              ],
          ];
  
-@@ -3897,6 +4036,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+@@ -3897,6 +4113,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
          $this->assertNull($override->duedate);
          $this->assertNull($override->cutoffdate);
          $this->assertNull($override->allowsubmissionsfromdate);

@@ -64,9 +64,19 @@ Practical workflow for manual reopening:
 
 1. Confirm the Assignment `Attempts reopened` setting is `Manually`.
 2. Create a user or group override with a higher `Allowed attempts` value.
-3. Return to the student's submission or grading page.
-4. Use `Allow another attempt`.
-5. The student can then submit the newly opened attempt.
+3. Confirm the override dates still allow submission, especially the cut-off date.
+4. Return to the student's submission or grading page.
+5. Use `Allow another attempt`.
+6. The student can then submit the newly opened attempt.
+
+For several students, teachers can use the grading table bulk action after creating the override:
+
+1. Create the user or group override first, including `Allowed attempts`, due date, and cut-off date.
+2. Go to `View all submissions`.
+3. Select the affected students in the grading table.
+4. Use the bulk `Allow another attempt` action.
+
+The bulk action only opens the next attempt for the selected students. It does not create an override and does not change `Allow submissions from`, due date, or cut-off date. If the cut-off date has already passed, update the user or group override dates before using the bulk action.
 
 If `Attempts reopened` is `Automatically until pass` or another automatic mode, Moodle's normal reopen logic still controls when another attempt is created. The override only changes the maximum allowed attempt count used by that logic.
 
@@ -101,7 +111,7 @@ Local testing included:
 - Manual testing of Assignment user and group overrides.
 - Behat user override add/edit/delete scenario.
 - Behat group override add/edit/delete scenario.
-- PHPUnit tests for user override attempts, group override attempts, unlimited attempts, override resolution, dates, and backup restore.
+- PHPUnit tests for user override attempts, group override attempts, unlimited attempts, bulk grant attempt visibility, override resolution, dates, and backup restore.
 - Moodle upgrade and cache purge checks.
 
 Residual risk: the full `mod_assign` PHPUnit suite and full Assignment Behat suite were not run.
