@@ -6,7 +6,10 @@ The patch is intended for Moodle `MOODLE_405_STABLE` and was tested locally on M
 
 ## Author
 
-Patch prepared and tested by @Portvgal (John Braz).
+Patch prepared and tested by 
+```text
+@Portvgal [John Braz].
+```
 
 ## Patch
 
