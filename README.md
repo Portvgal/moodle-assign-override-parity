@@ -21,8 +21,6 @@ php admin/cli/upgrade.php
 php admin/cli/purge_caches.php
 ```
 
-In Docker, run the PHP commands inside the Moodle web container.
-
 ## What It Adds
 
 Assignment overrides can now set `Allowed attempts`, matching the Assignment setting of the same name.
@@ -93,7 +91,7 @@ If a student needs a different result from their group, create a user override f
 
 Local testing included:
 
-- Manual Docker testing of Assignment user and group overrides.
+- Manual testing of Assignment user and group overrides.
 - Behat user override add/edit/delete scenario.
 - Behat group override add/edit/delete scenario.
 - PHPUnit tests for user override attempts, group override attempts, unlimited attempts, override resolution, dates, and backup restore.
