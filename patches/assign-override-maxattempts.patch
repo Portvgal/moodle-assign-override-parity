@@ -1,0 +1,553 @@
+diff --git a/mod/assign/backup/moodle2/backup_assign_stepslib.php b/mod/assign/backup/moodle2/backup_assign_stepslib.php
+index be6b6dcea21..be86a7dc4b5 100644
+--- a/mod/assign/backup/moodle2/backup_assign_stepslib.php
++++ b/mod/assign/backup/moodle2/backup_assign_stepslib.php
+@@ -141,7 +141,8 @@ class backup_assign_activity_structure_step extends backup_activity_structure_st
+ 
+         $overrides = new backup_nested_element('overrides');
+         $override = new backup_nested_element('override', array('id'), array(
+-            'groupid', 'userid', 'sortorder', 'allowsubmissionsfromdate', 'duedate', 'cutoffdate', 'timelimit'));
++            'groupid', 'userid', 'sortorder', 'allowsubmissionsfromdate', 'duedate', 'cutoffdate', 'timelimit',
++            'maxattempts'));
+ 
+         // Build the tree.
+         $assign->add_child($userflags);
+diff --git a/mod/assign/classes/privacy/provider.php b/mod/assign/classes/privacy/provider.php
+index 8918fe1078b..646bedeb8bf 100644
+--- a/mod/assign/classes/privacy/provider.php
++++ b/mod/assign/classes/privacy/provider.php
+@@ -83,7 +83,8 @@ class provider implements
+                 'userid' => 'privacy:metadata:userid',
+                 'allowsubmissionsfromdate' => 'allowsubmissionsfromdate',
+                 'duedate' => 'duedate',
+-                'cutoffdate' => 'cutoffdate'
++                'cutoffdate' => 'cutoffdate',
++                'maxattempts' => 'maxattempts'
+         ];
+         $assignsubmission = [
+                 'userid' => 'privacy:metadata:userid',
+@@ -627,6 +628,10 @@ class provider implements
+             if (!empty($overrides->allowsubmissionsfromdate)) {
+                 $data->allowsubmissionsfromdate = transform::datetime($overrides->allowsubmissionsfromdate);
+             }
++            if (isset($overrides->maxattempts)) {
++                $data->maxattempts = $overrides->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS ?
++                    get_string('unlimitedattempts', 'mod_assign') : $overrides->maxattempts;
++            }
+             if (!empty($data)) {
+                 writer::with_context($context)->export_data([get_string('overrides', 'mod_assign')], $data);
+             }
+diff --git a/mod/assign/db/install.xml b/mod/assign/db/install.xml
+index 8d18486e143..4794724ab67 100644
+--- a/mod/assign/db/install.xml
++++ b/mod/assign/db/install.xml
+@@ -157,6 +157,7 @@
+         <FIELD NAME="duedate" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Time by which students must have completed their attempt.  Can be null, in which case the assign default is used."/>
+         <FIELD NAME="cutoffdate" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Time by which students must have completed their attempt.  Can be null, in which case the assign default is used."/>
+         <FIELD NAME="timelimit" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Time limit in seconds. Can be null, in which case the quiz default is used."/>
++        <FIELD NAME="maxattempts" TYPE="int" LENGTH="6" NOTNULL="false" SEQUENCE="false" COMMENT="What is the maximum number of student attempts allowed for this assignment override? -1 means unlimited. Can be null, in which case the assign default is used."/>
+       </FIELDS>
+       <KEYS>
+         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+diff --git a/mod/assign/db/upgrade.php b/mod/assign/db/upgrade.php
+index b654574b795..c3db2a61196 100644
+--- a/mod/assign/db/upgrade.php
++++ b/mod/assign/db/upgrade.php
+@@ -112,5 +112,19 @@ function xmldb_assign_upgrade($oldversion) {
+     // Automatically generated Moodle v4.5.0 release upgrade line.
+     // Put any upgrade step following this.
+ 
++    if ($oldversion < 2024100701) {
++        // Define field maxattempts to be added to assign_overrides.
++        $table = new xmldb_table('assign_overrides');
++        $field = new xmldb_field('maxattempts', XMLDB_TYPE_INTEGER, '6', null, null, null, null, 'timelimit');
++
++        // Conditionally launch add field maxattempts.
++        if (!$dbman->field_exists($table, $field)) {
++            $dbman->add_field($table, $field);
++        }
++
++        // Assign savepoint reached.
++        upgrade_mod_savepoint(true, 2024100701, 'assign');
++    }
++
+     return true;
+ }
+diff --git a/mod/assign/gradingtable.php b/mod/assign/gradingtable.php
+index e1d97edb60f..38f076739fc 100644
+--- a/mod/assign/gradingtable.php
++++ b/mod/assign/gradingtable.php
+@@ -1225,11 +1225,13 @@ class assign_grading_table extends table_sql implements renderable {
+                 $menu->add(new action_menu_link_secondary($baseactionurl, null, $description));
+             }
+ 
+-            $ismanual = $this->assignment->get_instance()->attemptreopenmethod == ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL;
++            $this->assignment->update_effective_access($row->id);
++            $instance = $this->assignment->get_instance($row->id);
++            $ismanual = $instance->attemptreopenmethod == ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL;
+             $hassubmission = !empty($row->status);
+             $notreopened = $hassubmission && $row->status != ASSIGN_SUBMISSION_STATUS_REOPENED;
+-            $isunlimited = $this->assignment->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS;
+-            $hasattempts = $isunlimited || $row->attemptnumber < $this->assignment->get_instance()->maxattempts - 1;
++            $isunlimited = $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS;
++            $hasattempts = $isunlimited || $row->attemptnumber < $instance->maxattempts - 1;
+ 
+             if ($ismanual && $hassubmission && $notreopened && $hasattempts) {
+                 // Allow another attempt action link.
+@@ -1551,11 +1553,13 @@ class assign_grading_table extends table_sql implements renderable {
+             );
+         }
+ 
+-        $ismanual = $this->assignment->get_instance()->attemptreopenmethod == ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL;
++        $this->assignment->update_effective_access($row->id);
++        $instance = $this->assignment->get_instance($row->id);
++        $ismanual = $instance->attemptreopenmethod == ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL;
+         $hassubmission = !empty($row->status);
+         $notreopened = $hassubmission && $row->status != ASSIGN_SUBMISSION_STATUS_REOPENED;
+-        $isunlimited = $this->assignment->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS;
+-        $hasattempts = $isunlimited || $row->attemptnumber < $this->assignment->get_instance()->maxattempts - 1;
++        $isunlimited = $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS;
++        $hasattempts = $isunlimited || $row->attemptnumber < $instance->maxattempts - 1;
+ 
+         if ($ismanual && $hassubmission && $notreopened && $hasattempts) {
+             $urlparams = array('id' => $this->assignment->get_course_module()->id,
+diff --git a/mod/assign/locallib.php b/mod/assign/locallib.php
+index 16508b28c98..a7933a9bcb1 100644
+--- a/mod/assign/locallib.php
++++ b/mod/assign/locallib.php
+@@ -998,7 +998,7 @@ class assign {
+         $override = $this->override_exists($userid);
+ 
+         // Merge with assign defaults.
+-        $keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit');
++        $keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts');
+         foreach ($keys as $key) {
+             if (isset($override->{$key})) {
+                 $this->get_instance($userid)->{$key} = $override->{$key};
+@@ -1065,7 +1065,8 @@ class assign {
+         // return arrays containing keys for only the defined overrides. So we get the
+         // desired behaviour as per the algorithm.
+         return (object)array_merge(
+-            ['timelimit' => null, 'duedate' => null, 'cutoffdate' => null, 'allowsubmissionsfromdate' => null],
++            ['timelimit' => null, 'duedate' => null, 'cutoffdate' => null, 'allowsubmissionsfromdate' => null,
++                'maxattempts' => null],
+             $getgroupoverride($userid),
+             $getuseroverride($userid)
+         );
+@@ -8063,27 +8064,29 @@ class assign {
+         }
+ 
+         // Do not show if we are editing a previous attempt.
++        $this->update_effective_access($userid);
++        $instance = $this->get_instance($userid);
+         if (($attemptnumber == -1 || ($attemptnumber + 1) == count($this->get_all_submissions($userid))) &&
+-                ($this->get_instance()->maxattempts > 1 || $this->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)) {
++                ($instance->maxattempts > 1 || $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)) {
+             $mform->addElement('header', 'attemptsettings', get_string('attemptsettings', 'assign'));
+-            $attemptreopenmethod = get_string('attemptreopenmethod_' . $this->get_instance()->attemptreopenmethod, 'assign');
++            $attemptreopenmethod = get_string('attemptreopenmethod_' . $instance->attemptreopenmethod, 'assign');
+             $mform->addElement('static', 'attemptreopenmethod', get_string('attemptreopenmethod', 'assign'), $attemptreopenmethod);
+ 
+             $attemptnumber = 0;
+             if ($submission) {
+                 $attemptnumber = $submission->attemptnumber;
+             }
+-            $maxattempts = $this->get_instance()->maxattempts;
++            $maxattempts = $instance->maxattempts;
+             if ($maxattempts == ASSIGN_UNLIMITED_ATTEMPTS) {
+                 $maxattempts = get_string('unlimitedattempts', 'assign');
+             }
+             $mform->addelement('static', 'maxattemptslabel', get_string('maxattempts', 'assign'), $maxattempts);
+             $mform->addelement('static', 'attemptnumberlabel', get_string('attemptnumber', 'assign'), $attemptnumber + 1);
+ 
+-            $ismanual = $this->get_instance()->attemptreopenmethod == ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL;
++            $ismanual = $instance->attemptreopenmethod == ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL;
+             $issubmission = !empty($submission);
+-            $isunlimited = $this->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS;
+-            $islessthanmaxattempts = $issubmission && ($submission->attemptnumber < ($this->get_instance()->maxattempts-1));
++            $isunlimited = $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS;
++            $islessthanmaxattempts = $issubmission && ($submission->attemptnumber < ($instance->maxattempts - 1));
+ 
+             if ($ismanual && (!$issubmission || $isunlimited || $islessthanmaxattempts)) {
+                 $mform->addElement('selectyesno', 'addattempt', get_string('addattempt', 'assign'));
+@@ -8797,7 +8800,8 @@ class assign {
+      * @return bool - true if another attempt was added.
+      */
+     protected function reopen_submission_if_required($userid, $submission, $addattempt) {
+-        $instance = $this->get_instance();
++        $this->update_effective_access($userid);
++        $instance = $this->get_instance($userid);
+         $maxattemptsreached = !empty($submission) &&
+                               $submission->attemptnumber >= ($instance->maxattempts - 1) &&
+                               $instance->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS;
+@@ -9075,13 +9079,15 @@ class assign {
+      */
+     protected function add_attempt($userid) {
+         require_capability('mod/assign:grade', $this->context);
++        $this->update_effective_access($userid);
++        $instance = $this->get_instance($userid);
+ 
+         // If additional attempts are disallowed.
+-        if ($this->get_instance()->maxattempts == 1) {
++        if ($instance->maxattempts == 1) {
+             return false;
+         }
+ 
+-        if ($this->get_instance()->teamsubmission) {
++        if ($instance->teamsubmission) {
+             $oldsubmission = $this->get_group_submission($userid, 0, false);
+         } else {
+             $oldsubmission = $this->get_user_submission($userid, false);
+@@ -9092,13 +9098,13 @@ class assign {
+         }
+ 
+         // No more than max attempts allowed.
+-        if ($this->get_instance()->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS &&
+-            $oldsubmission->attemptnumber >= ($this->get_instance()->maxattempts - 1)) {
++        if ($instance->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS &&
++            $oldsubmission->attemptnumber >= ($instance->maxattempts - 1)) {
+             return false;
+         }
+ 
+         // Create the new submission record for the group/user.
+-        if ($this->get_instance()->teamsubmission) {
++        if ($instance->teamsubmission) {
+             if (isset($this->mostrecentteamsubmission)) {
+                 // Team submissions can end up in this function for each user (via save_grade). We don't want to create
+                 // more than one attempt for the whole team.
+@@ -9126,7 +9132,7 @@ class assign {
+             }
+         }
+ 
+-        $this->update_submission($newsubmission, $userid, false, $this->get_instance()->teamsubmission);
++        $this->update_submission($newsubmission, $userid, false, $instance->teamsubmission);
+         $flags = $this->get_user_flags($userid, false);
+         if (isset($flags->locked) && $flags->locked) { // May not exist.
+             $this->process_unlock_submission($userid);
+diff --git a/mod/assign/override_form.php b/mod/assign/override_form.php
+index 8f5f7cf4901..48218ca2e25 100644
+--- a/mod/assign/override_form.php
++++ b/mod/assign/override_form.php
+@@ -270,6 +270,14 @@ class assign_override_form extends moodleform {
+             $mform->setDefault('timelimit', $assigninstance->timelimit);
+         }
+ 
++        // Number of attempts.
++        $attemptoptions = [ASSIGN_UNLIMITED_ATTEMPTS => get_string('unlimitedattempts', 'mod_assign')];
++        $attemptoptions += array_combine(range(1, 30), range(1, 30));
++        $mform->addElement('select', 'maxattempts', get_string('maxattempts', 'mod_assign'), $attemptoptions);
++        $mform->addHelpButton('maxattempts', 'maxattempts', 'assign');
++        $mform->setDefault('maxattempts', $assigninstance->maxattempts);
++        $mform->setType('maxattempts', PARAM_INT);
++
+         // Submit buttons.
+         $mform->addElement('submit', 'resetbutton',
+                 get_string('reverttodefaults', 'assign'));
+@@ -345,7 +353,7 @@ class assign_override_form extends moodleform {
+ 
+         // Ensure that at least one assign setting was changed.
+         $changed = false;
+-        $keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit');
++        $keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts');
+         foreach ($keys as $key) {
+             if (isset($data[$key]) && $data[$key] != $assigninstance->{$key}) {
+                 $changed = true;
+diff --git a/mod/assign/overrideedit.php b/mod/assign/overrideedit.php
+index 88f38217baf..69cf307dc41 100644
+--- a/mod/assign/overrideedit.php
++++ b/mod/assign/overrideedit.php
+@@ -96,7 +96,7 @@ if ($overrideid) {
+ }
+ 
+ // Merge assign defaults with data.
+-$keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit');
++$keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts');
+ foreach ($keys as $key) {
+     if (!isset($data->{$key}) || $reset) {
+         $data->{$key} = $assigninstance->{$key};
+diff --git a/mod/assign/overrides.php b/mod/assign/overrides.php
+index e41efdb992c..b035531dd05 100644
+--- a/mod/assign/overrides.php
++++ b/mod/assign/overrides.php
+@@ -217,6 +217,13 @@ foreach ($overrides as $override) {
+         $values[] = $override->timelimit > 0 ? format_time($override->timelimit) : get_string('none', 'assign');
+     }
+ 
++    // Format allowed attempts.
++    if (isset($override->maxattempts)) {
++        $fields[] = get_string('maxattempts', 'assign');
++        $values[] = $override->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS ?
++            get_string('unlimitedattempts', 'assign') : $override->maxattempts;
++    }
++
+     // Icons.
+     $iconstr = '';
+ 
+diff --git a/mod/assign/tests/backup/restore_date_test.php b/mod/assign/tests/backup/restore_date_test.php
+index a438e7a9890..17f0f990fd7 100644
+--- a/mod/assign/tests/backup/restore_date_test.php
++++ b/mod/assign/tests/backup/restore_date_test.php
+@@ -52,7 +52,8 @@ final class restore_date_test extends \restore_date_testcase {
+             'sortorder' => 1,
+             'allowsubmissionsfromdate' => 100,
+             'duedate' => 200,
+-            'cutoffdate' => 300
++            'cutoffdate' => 300,
++            'maxattempts' => 4
+         ];
+         $DB->insert_record('assign_overrides', $override);
+ 
+@@ -77,6 +78,7 @@ final class restore_date_test extends \restore_date_testcase {
+         $this->assertEquals($override->duedate + $diff, $newoverride->duedate);
+         $this->assertEquals($override->cutoffdate + $diff, $newoverride->cutoffdate);
+         $this->assertEquals($override->allowsubmissionsfromdate + $diff, $newoverride->allowsubmissionsfromdate);
++        $this->assertEquals($override->maxattempts, $newoverride->maxattempts);
+ 
+         // Assign grade time checks.
+         $this->assertEquals($grade->timecreated, $newgrade->timecreated);
+diff --git a/mod/assign/tests/behat/assign_group_override.feature b/mod/assign/tests/behat/assign_group_override.feature
+index d165dc199f9..a781dc6bc79 100644
+--- a/mod/assign/tests/behat/assign_group_override.feature
++++ b/mod/assign/tests/behat/assign_group_override.feature
+@@ -39,15 +39,20 @@ Feature: Assign group override
+     And I select "Group overrides" from the "jump" singleselect
+     And I press "Add group override"
+     And I set the following fields to these values:
+-      | Override group | Group 1              |
+-      | Due date       | ##1 Jan 2020 08:00## |
++      | Override group   | Group 1              |
++      | Due date         | ##1 Jan 2020 08:00## |
++      | Allowed attempts | 4                    |
+     And I press "Save"
+     Then I should see "Wednesday, 1 January 2020, 8:00"
++    And I should see "Allowed attempts"
++    And I should see "4"
+     And I click on "Edit" "link" in the "Group 1" "table_row"
+     And I set the following fields to these values:
+-      | Due date       | ##1 Jan 2030 08:00## |
++      | Due date         | ##1 Jan 2030 08:00## |
++      | Allowed attempts | 5                    |
+     And I press "Save"
+     And I should see "Tuesday, 1 January 2030, 8:00"
++    And I should see "5"
+     And I click on "Delete" "link"
+     And I press "Continue"
+     And I should not see "Group 1"
+diff --git a/mod/assign/tests/behat/assign_user_override.feature b/mod/assign/tests/behat/assign_user_override.feature
+index 776fb557527..84a8ec89a23 100644
+--- a/mod/assign/tests/behat/assign_user_override.feature
++++ b/mod/assign/tests/behat/assign_user_override.feature
+@@ -28,15 +28,20 @@ Feature: Assign user override
+     When I navigate to "Overrides" in current page administration
+     And I press "Add user override"
+     And I set the following fields to these values:
+-      | Override user | Student1                            |
+-      | Due date      | ##first day of January 2020 08:00## |
++      | Override user    | Student1                            |
++      | Due date         | ##first day of January 2020 08:00## |
++      | Allowed attempts | 4                                   |
+     And I press "Save"
+     Then I should see "Wednesday, 1 January 2020, 8:00"
++    And I should see "Allowed attempts"
++    And I should see "4"
+     And I click on "Edit" "link" in the "Sam1 Student1" "table_row"
+     And I set the following fields to these values:
+-      | Due date      | ##first day of January 2030 08:00## |
++      | Due date         | ##first day of January 2030 08:00## |
++      | Allowed attempts | 5                                   |
+     And I press "Save"
+     And I should see "Tuesday, 1 January 2030, 8:00"
++    And I should see "5"
+     And I click on "Delete" "link"
+     And I press "Continue"
+     And I should not see "Sam1 Student1"
+diff --git a/mod/assign/tests/locallib_test.php b/mod/assign/tests/locallib_test.php
+index f0e1b8d7eba..b81cd5bb8f2 100644
+--- a/mod/assign/tests/locallib_test.php
++++ b/mod/assign/tests/locallib_test.php
+@@ -2667,6 +2667,142 @@ final class locallib_test extends \advanced_testcase {
+         $this->assertEmpty($grades);
+     }
+ 
++    /**
++     * Test that a user override can allow one more manual attempt than the assignment default.
++     */
++    public function test_user_override_maxattempts_allows_manual_extra_attempt(): void {
++        global $DB, $PAGE;
++
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++        $teacher = $this->getDataGenerator()->create_and_enrol($course, 'teacher');
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL,
++            'maxattempts' => 3,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++        $PAGE->set_url(new \moodle_url('/mod/assign/view.php', ['id' => $assign->get_course_module()->id]));
++
++        $teacher->ignoresesskey = true;
++        $this->create_graded_attempt($student, $teacher, $assign, 0);
++        $this->setUser($teacher);
++        $this->assertTrue($assign->testable_process_add_attempt($student->id));
++
++        $this->create_graded_attempt($student, $teacher, $assign, 1);
++        $this->setUser($teacher);
++        $this->assertTrue($assign->testable_process_add_attempt($student->id));
++
++        $this->create_graded_attempt($student, $teacher, $assign, 2);
++        $this->setUser($teacher);
++        $this->assertFalse($assign->testable_process_add_attempt($student->id));
++
++        $DB->insert_record('assign_overrides', (object) [
++            'assignid' => $assign->get_instance()->id,
++            'userid' => $student->id,
++            'maxattempts' => 4,
++        ]);
++
++        $this->assertTrue($assign->testable_process_add_attempt($student->id));
++        $submission = $assign->get_user_submission($student->id, false);
++        $this->assertEquals(3, $submission->attemptnumber);
++    }
++
++    /**
++     * Test that a group override can allow one more manual attempt than the assignment default.
++     */
++    public function test_group_override_maxattempts_allows_manual_extra_attempt(): void {
++        global $DB, $PAGE;
++
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++        $teacher = $this->getDataGenerator()->create_and_enrol($course, 'teacher');
++        $group = $this->getDataGenerator()->create_group(['courseid' => $course->id]);
++        groups_add_member($group, $student);
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL,
++            'maxattempts' => 3,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++        $PAGE->set_url(new \moodle_url('/mod/assign/view.php', ['id' => $assign->get_course_module()->id]));
++
++        $teacher->ignoresesskey = true;
++        $this->create_graded_attempt($student, $teacher, $assign, 0);
++        $this->setUser($teacher);
++        $this->assertTrue($assign->testable_process_add_attempt($student->id));
++
++        $this->create_graded_attempt($student, $teacher, $assign, 1);
++        $this->setUser($teacher);
++        $this->assertTrue($assign->testable_process_add_attempt($student->id));
++
++        $this->create_graded_attempt($student, $teacher, $assign, 2);
++        $this->setUser($teacher);
++        $this->assertFalse($assign->testable_process_add_attempt($student->id));
++
++        $DB->insert_record('assign_overrides', (object) [
++            'assignid' => $assign->get_instance()->id,
++            'groupid' => $group->id,
++            'sortorder' => 1,
++            'maxattempts' => 4,
++        ]);
++
++        $this->assertTrue($assign->testable_process_add_attempt($student->id));
++        $submission = $assign->get_user_submission($student->id, false);
++        $this->assertEquals(3, $submission->attemptnumber);
++    }
++
++    /**
++     * Test that an unlimited attempts override can allow attempts when the assignment default does not.
++     */
++    public function test_user_override_unlimited_maxattempts_allows_attempt_when_default_disallows(): void {
++        global $DB, $PAGE;
++
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++        $teacher = $this->getDataGenerator()->create_and_enrol($course, 'teacher');
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL,
++            'maxattempts' => 1,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++        $PAGE->set_url(new \moodle_url('/mod/assign/view.php', ['id' => $assign->get_course_module()->id]));
++
++        $teacher->ignoresesskey = true;
++        $this->create_graded_attempt($student, $teacher, $assign, 0);
++        $this->setUser($teacher);
++        $this->assertFalse($assign->testable_process_add_attempt($student->id));
++
++        $DB->insert_record('assign_overrides', (object) [
++            'assignid' => $assign->get_instance()->id,
++            'userid' => $student->id,
++            'maxattempts' => ASSIGN_UNLIMITED_ATTEMPTS,
++        ]);
++
++        $this->assertTrue($assign->testable_process_add_attempt($student->id));
++    }
++
++    /**
++     * Create, submit, and grade one assignment attempt.
++     *
++     * @param \stdClass $student The student user.
++     * @param \stdClass $teacher The teacher user.
++     * @param \assign $assign The assignment instance.
++     * @param int $attemptnumber The attempt number to grade.
++     */
++    private function create_graded_attempt(\stdClass $student, \stdClass $teacher, \assign $assign, int $attemptnumber): void {
++        $this->add_submission($student, $assign, 'Submission text ' . $attemptnumber);
++        $this->submit_for_grading($student, $assign);
++        $this->mark_submission($teacher, $assign, $student, 50.0, [], $attemptnumber);
++    }
++
+     /**
+      * Test reopen behavior when in "Reopen until pass" mode.
+      */
+@@ -3851,6 +3987,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+                 'duedate' => 2,
+                 'cutoffdate' => 3,
+                 'timelimit' => null,
++                'maxattempts' => 4,
+             ],
+             (object) [
+                 // Override for group 2, lower priority (numerically higher sortorder).
+@@ -3862,6 +3999,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+                 'duedate' => 6,
+                 'cutoffdate' => 6,
+                 'timelimit' => null,
++                'maxattempts' => 5,
+             ],
+             (object) [
+                 // User override.
+@@ -3873,6 +4011,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+                 'duedate' => 8,
+                 'cutoffdate' => 9,
+                 'timelimit' => null,
++                'maxattempts' => 6,
+             ],
+         ];
+ 
+@@ -3897,6 +4036,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+         $this->assertNull($override->duedate);
+         $this->assertNull($override->cutoffdate);
+         $this->assertNull($override->allowsubmissionsfromdate);
++        $this->assertNull($override->maxattempts);
+     }
+ 
+     /**
+diff --git a/mod/assign/version.php b/mod/assign/version.php
+index f3adfdf307a..8cdae5596ac 100644
+--- a/mod/assign/version.php
++++ b/mod/assign/version.php
+@@ -25,5 +25,5 @@
+ defined('MOODLE_INTERNAL') || die();
+ 
+ $plugin->component = 'mod_assign'; // Full name of the plugin (used for diagnostics).
+-$plugin->version  = 2024100700;    // The current module version (Date: YYYYMMDDXX).
++$plugin->version  = 2024100701;    // The current module version (Date: YYYYMMDDXX).
+ $plugin->requires = 2024100100;    // Requires this Moodle version.
