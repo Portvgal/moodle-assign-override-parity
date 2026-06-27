@@ -8,7 +8,7 @@ The patch is intended for Moodle `MOODLE_405_STABLE` and was tested locally on M
 
 Patch prepared and tested by 
 ```text
-@Portvgal [John Braz].
+@Portvgal [John Braz]
 ```
 
 ## Patch
