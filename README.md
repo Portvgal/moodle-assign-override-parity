@@ -4,6 +4,14 @@ This repository contains a patch for Moodle core `mod_assign` that adds `Allowed
 
 The patch is intended for Moodle `MOODLE_405_STABLE` and was tested locally on Moodle `4.5.11+`.
 
+## Author
+
+Patch prepared and tested by:
+
+```text
+Portvgal
+```
+
 ## Patch
 
 Patch file:
