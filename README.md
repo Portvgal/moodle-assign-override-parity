@@ -121,13 +121,34 @@ If a student needs a different result from their group, create a user override f
 
 ## Tested
 
-Local testing included:
+Local testing on Moodle `4.5.11+` and Moodle `5.2.1+` included:
 
 - Manual testing of Assignment user and group overrides.
 - Manual testing of the bulk `Allow another attempt` workflow after creating a group override.
-- Behat user override add/edit/delete scenario.
-- Behat group override add/edit/delete scenario.
-- PHPUnit tests for user override attempts, group override attempts, unlimited attempts, bulk grant attempt visibility, override resolution, dates, and backup restore.
+- Clean patch apply checks against fresh Moodle 4.5 and Moodle 5.2 worktrees.
 - Moodle upgrade and cache purge checks.
+- Schema/version checks confirming `assign_overrides.maxattempts` exists.
+- PHP syntax checks and whitespace checks for changed `mod_assign` files.
+- PHPUnit tests for user override attempts, group override attempts, unlimited attempts, bulk grant attempt visibility, override resolution, and backup restore.
+- Behat user override add/edit/delete scenarios.
+- Behat group override add/edit/delete scenarios.
+- HTTP smoke checks for both local Moodle sites.
+
+Latest focused automated results:
+
+```text
+Moodle 4.5.11+
+- PHPUnit locallib focus: 7 tests, 25 assertions, passed.
+- PHPUnit backup restore-date: 2 tests, 47 assertions, passed.
+- Behat user override: 9 scenarios, 125 steps, passed.
+- Behat group override: 13 scenarios, 224 steps, passed.
+
+Moodle 5.2.1+
+- PHPUnit locallib focus: 7 tests, 25 assertions, passed.
+- PHPUnit backup restore-date: 2 tests, 51 assertions, passed.
+- Behat user and group override: 26 scenarios, 455 steps, passed.
+```
+
+Unrelated third-party plugin schema warnings were ignored where they did not involve `mod_assign`.
 
 Residual risk: the full `mod_assign` PHPUnit suite and full Assignment Behat suite were not run.
