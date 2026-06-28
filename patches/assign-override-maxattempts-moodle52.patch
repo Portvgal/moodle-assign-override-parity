@@ -124,6 +124,18 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
              $getgroupoverride($userid),
              $getuseroverride($userid)
          );
+@@ -4945,10 +4946,7 @@ class assign {
+             $jsparams['removesubmission'] = has_capability('mod/assign:editothersubmission', $this->context);
+             $jsparams['extend'] = $this->get_instance()->duedate && has_capability('mod/assign:grantextension', $this->context);
+ 
+-            $multipleattemptsallowed = $this->get_instance()->maxattempts > 1
+-                || $this->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS;
+-            $jsparams['grantattempt'] =
+-                $multipleattemptsallowed && $this->get_instance()->attemptreopenmethod == ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL;
++            $jsparams['grantattempt'] = $this->has_bulk_grant_attempt_available($users);
+ 
+             $jsparams['pluginoperations'] = [];
+             foreach ($this->get_feedback_plugins() as $plugin) {
 @@ -8592,27 +8593,29 @@ class assign {
          }
  
@@ -170,6 +182,36 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
          $maxattemptsreached = !empty($submission) &&
                                $submission->attemptnumber >= ($instance->maxattempts - 1) &&
                                $instance->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS;
+@@ -9724,6 +9728,29 @@ class assign {
+         return $result;
+     }
+ 
++    /**
++     * Check whether the bulk grant attempt action should be available for the listed users.
++     *
++     * @param array $useridlist Array of userids visible in the grading table.
++     * @return bool
++     */
++    protected function has_bulk_grant_attempt_available(array $useridlist): bool {
++        foreach ($useridlist as $userid) {
++            $this->update_effective_access($userid);
++            $instance = $this->get_instance($userid);
++
++            if ($instance->attemptreopenmethod != ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL) {
++                continue;
++            }
++
++            if ($instance->maxattempts > 1 || $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS) {
++                return true;
++            }
++        }
++
++        return false;
++    }
++
+     /**
+      * Check for a sess key and then call add_attempt.
+      *
 @@ -9765,13 +9769,15 @@ class assign {
       */
      protected function add_attempt($userid) {
@@ -345,10 +387,24 @@ diff --git a/public/mod/assign/tests/behat/assign_user_override.feature b/public
      And I click on "Delete" "link"
      And I press "Continue"
      And I should not see "Sam1 Student1"
+diff --git a/public/mod/assign/tests/fixtures/testable_assign.php b/public/mod/assign/tests/fixtures/testable_assign.php
+--- a/public/mod/assign/tests/fixtures/testable_assign.php
++++ b/public/mod/assign/tests/fixtures/testable_assign.php
+@@ -61,6 +61,10 @@ class mod_assign_testable_assign extends assign {
+         return parent::process_add_attempt($userid);
+     }
+ 
++    public function testable_has_bulk_grant_attempt_available(array $useridlist): bool {
++        return parent::has_bulk_grant_attempt_available($useridlist);
++    }
++
+     public function testable_process_save_quick_grades($postdata) {
+         // Ugly hack to get something into the method.
+         global $_POST;
 diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests/locallib_test.php
 --- a/public/mod/assign/tests/locallib_test.php
 +++ b/public/mod/assign/tests/locallib_test.php
-@@ -3066,6 +3066,142 @@ final class locallib_test extends \advanced_testcase {
+@@ -3066,6 +3066,219 @@ final class locallib_test extends \advanced_testcase {
          $this->assertEmpty($grades);
      }
  
@@ -475,6 +531,83 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
 +    }
 +
 +    /**
++     * Test that the bulk grant attempt action is available when a group override allows extra attempts.
++     */
++    public function test_group_override_maxattempts_allows_bulk_grant_attempt_action(): void {
++        global $DB;
++
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++        $otherstudent = $this->getDataGenerator()->create_and_enrol($course, 'student');
++        $group = $this->getDataGenerator()->create_group(['courseid' => $course->id]);
++        groups_add_member($group, $student);
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL,
++            'maxattempts' => 1,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++
++        $this->assertFalse($assign->testable_has_bulk_grant_attempt_available([$student->id, $otherstudent->id]));
++
++        $DB->insert_record('assign_overrides', (object) [
++            'assignid' => $assign->get_instance()->id,
++            'groupid' => $group->id,
++            'sortorder' => 1,
++            'maxattempts' => 3,
++        ]);
++
++        $this->assertTrue($assign->testable_has_bulk_grant_attempt_available([$student->id, $otherstudent->id]));
++        $this->assertFalse($assign->testable_has_bulk_grant_attempt_available([$otherstudent->id]));
++    }
++
++    /**
++     * Test that the bulk grant attempt action is unavailable when no override allows extra attempts.
++     */
++    public function test_bulk_grant_attempt_action_unavailable_without_extra_attempts(): void {
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_MANUAL,
++            'maxattempts' => 1,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++
++        $this->assertFalse($assign->testable_has_bulk_grant_attempt_available([$student->id]));
++    }
++
++    /**
++     * Test that an attempts override does not expose bulk grant attempt unless reopening is manual.
++     */
++    public function test_bulk_grant_attempt_action_unavailable_when_reopening_is_not_manual(): void {
++        global $DB;
++
++        $this->resetAfterTest();
++        $course = $this->getDataGenerator()->create_course();
++        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
++
++        $assign = $this->create_instance($course, [
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_NONE,
++            'maxattempts' => 1,
++            'submissiondrafts' => 1,
++            'assignsubmission_onlinetext_enabled' => 1,
++        ]);
++
++        $DB->insert_record('assign_overrides', (object) [
++            'assignid' => $assign->get_instance()->id,
++            'userid' => $student->id,
++            'maxattempts' => 3,
++        ]);
++
++        $this->assertFalse($assign->testable_has_bulk_grant_attempt_available([$student->id]));
++    }
++
++    /**
 +     * Create, submit, and grade one assignment attempt.
 +     *
 +     * @param \stdClass $student The student user.
@@ -491,7 +624,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
      /**
       * Test reopen behavior when in "Reopen until pass" mode.
       */
-@@ -4242,6 +4378,7 @@ final class locallib_test extends \advanced_testcase {
+@@ -4242,6 +4455,7 @@ final class locallib_test extends \advanced_testcase {
                  'duedate' => 2,
                  'cutoffdate' => 3,
                  'timelimit' => null,
@@ -499,7 +632,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
                  'reason' => null,
                  'reasonformat' => 0,
              ],
-@@ -4255,6 +4392,7 @@ final class locallib_test extends \advanced_testcase {
+@@ -4255,6 +4469,7 @@ final class locallib_test extends \advanced_testcase {
                  'duedate' => 6,
                  'cutoffdate' => 6,
                  'timelimit' => null,
@@ -507,7 +640,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
                  'reason' => null,
                  'reasonformat' => 0,
              ],
-@@ -4268,6 +4406,7 @@ final class locallib_test extends \advanced_testcase {
+@@ -4268,6 +4483,7 @@ final class locallib_test extends \advanced_testcase {
                  'duedate' => 8,
                  'cutoffdate' => 9,
                  'timelimit' => null,
@@ -515,7 +648,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
                  'reason' => null,
                  'reasonformat' => 0,
              ],
-@@ -4294,6 +4433,7 @@ final class locallib_test extends \advanced_testcase {
+@@ -4294,6 +4510,7 @@ final class locallib_test extends \advanced_testcase {
          $this->assertNull($override->duedate);
          $this->assertNull($override->cutoffdate);
          $this->assertNull($override->allowsubmissionsfromdate);
