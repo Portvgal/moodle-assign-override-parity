@@ -610,7 +610,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
 +        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
 +
 +        $assign = $this->create_instance($course, [
-+            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_NONE,
++            'attemptreopenmethod' => ASSIGN_ATTEMPT_REOPEN_METHOD_AUTOMATIC,
 +            'maxattempts' => 1,
 +            'submissiondrafts' => 1,
 +            'assignsubmission_onlinetext_enabled' => 1,
