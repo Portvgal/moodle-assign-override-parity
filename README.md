@@ -2,7 +2,7 @@
 
 This repository contains a patch for Moodle core `mod_assign` that adds `Allowed attempts` to Assignment user and group overrides.
 
-The patch is intended for Moodle `MOODLE_405_STABLE` and was tested locally on Moodle `4.5.11+`.
+Patch files are provided for Moodle `MOODLE_405_STABLE` and Moodle 5.2 development/test checkouts.
 
 ## Author
 
@@ -124,6 +124,7 @@ If a student needs a different result from their group, create a user override f
 Local testing included:
 
 - Manual testing of Assignment user and group overrides.
+- Manual testing of the bulk `Allow another attempt` workflow after creating a group override.
 - Behat user override add/edit/delete scenario.
 - Behat group override add/edit/delete scenario.
 - PHPUnit tests for user override attempts, group override attempts, unlimited attempts, bulk grant attempt visibility, override resolution, dates, and backup restore.
