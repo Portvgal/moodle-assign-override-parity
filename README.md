@@ -11,19 +11,25 @@ Patch prepared and tested by
 @Portvgal [John Braz]
 ```
 
-## Patch
+## Patch Files
 
-Patch file:
+For Moodle 4.5:
 
 ```text
 patches/assign-override-maxattempts.patch
 ```
 
-Apply it from the root of a Moodle checkout:
+For Moodle 5.2:
+
+```text
+patches/assign-override-maxattempts-moodle52.patch
+```
+
+Apply the matching patch from the root of a Moodle checkout:
 
 ```bash
 git checkout -b test-assign-override-maxattempts
-git apply /path/to/assign-override-maxattempts.patch
+git apply /path/to/matching-assign-override-maxattempts.patch
 php admin/cli/upgrade.php
 php admin/cli/purge_caches.php
 ```
@@ -42,7 +48,7 @@ User override allowed attempts: 3
 Result: that user may have 3 total attempts.
 ```
 
-## Using Override Attempts With Assignment Settings
+## Using Override Attempts With Manual Reopening
 
 Override attempts work together with the Assignment `Attempts reopened` setting.
 
@@ -60,7 +66,7 @@ Teacher creates user override allowed attempts: 3
 
 At this point the student still may not see a new attempt until the teacher explicitly allows another attempt. The override raises the limit; it does not reopen the submission by itself.
 
-Practical workflow for manual reopening:
+### Single Student Workflow
 
 1. Confirm the Assignment `Attempts reopened` setting is `Manually`.
 2. Create a user or group override with a higher `Allowed attempts` value.
@@ -69,14 +75,23 @@ Practical workflow for manual reopening:
 5. Use `Allow another attempt`.
 6. The student can then submit the newly opened attempt.
 
-For several students, teachers can use the grading table bulk action after creating the override:
+### Bulk Workflow For Several Students
+
+Use the bulk action only after the user or group override is already correct.
 
 1. Create the user or group override first, including `Allowed attempts`, due date, and cut-off date.
 2. Go to `View all submissions`.
 3. Select the affected students in the grading table.
-4. Use the bulk `Allow another attempt` action.
+4. In the sticky footer toolbar, open `More`.
+5. Choose `Allow another attempt`.
 
 The bulk action only opens the next attempt for the selected students. It does not create an override and does not change `Allow submissions from`, due date, or cut-off date. If the cut-off date has already passed, update the user or group override dates before using the bulk action.
+
+If the bulk `Allow another attempt` action is not visible, check that:
+
+- `Attempts reopened` is set to `Manually`.
+- The selected students have an effective user or group override with `Allowed attempts` greater than the assignment default.
+- The updated patch has been applied and Moodle caches have been purged.
 
 If `Attempts reopened` is `Automatically until pass` or another automatic mode, Moodle's normal reopen logic still controls when another attempt is created. The override only changes the maximum allowed attempt count used by that logic.
 
