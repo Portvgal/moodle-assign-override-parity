@@ -120,7 +120,7 @@ index 16508b28c98..a7933a9bcb1 100644
  
          // Merge with assign defaults.
 -        $keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit');
-+        $keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts');
++        $keys = ['duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts'];
          foreach ($keys as $key) {
              if (isset($override->{$key})) {
                  $this->get_instance($userid)->{$key} = $override->{$key};
@@ -128,9 +128,8 @@ index 16508b28c98..a7933a9bcb1 100644
          // return arrays containing keys for only the defined overrides. So we get the
          // desired behaviour as per the algorithm.
          return (object)array_merge(
--            ['timelimit' => null, 'duedate' => null, 'cutoffdate' => null, 'allowsubmissionsfromdate' => null],
-+            ['timelimit' => null, 'duedate' => null, 'cutoffdate' => null, 'allowsubmissionsfromdate' => null,
-+                'maxattempts' => null],
+             ['timelimit' => null, 'duedate' => null, 'cutoffdate' => null, 'allowsubmissionsfromdate' => null],
++            ['maxattempts' => null],
              $getgroupoverride($userid),
              $getuseroverride($userid)
          );
@@ -146,15 +145,18 @@ index 16508b28c98..a7933a9bcb1 100644
  
              $jsparams['pluginoperations'] = [];
              foreach ($this->get_feedback_plugins() as $plugin) {
-@@ -8063,27 +8064,29 @@ class assign {
+@@ -8063,27 +8064,31 @@ class assign {
          }
  
          // Do not show if we are editing a previous attempt.
 +        $this->update_effective_access($userid);
 +        $instance = $this->get_instance($userid);
-         if (($attemptnumber == -1 || ($attemptnumber + 1) == count($this->get_all_submissions($userid))) &&
+-        if (($attemptnumber == -1 || ($attemptnumber + 1) == count($this->get_all_submissions($userid))) &&
 -                ($this->get_instance()->maxattempts > 1 || $this->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)) {
-+                ($instance->maxattempts > 1 || $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)) {
++        if (
++                ($attemptnumber == -1 || ($attemptnumber + 1) == count($this->get_all_submissions($userid))) &&
++                ($instance->maxattempts > 1 || $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)
++        ) {
              $mform->addElement('header', 'attemptsettings', get_string('attemptsettings', 'assign'));
 -            $attemptreopenmethod = get_string('attemptreopenmethod_' . $this->get_instance()->attemptreopenmethod, 'assign');
 +            $attemptreopenmethod = get_string('attemptreopenmethod_' . $instance->attemptreopenmethod, 'assign');
@@ -240,14 +242,16 @@ index 16508b28c98..a7933a9bcb1 100644
              $oldsubmission = $this->get_group_submission($userid, 0, false);
          } else {
              $oldsubmission = $this->get_user_submission($userid, false);
-@@ -9092,13 +9098,13 @@ class assign {
+@@ -9092,13 +9098,15 @@ class assign {
          }
  
          // No more than max attempts allowed.
 -        if ($this->get_instance()->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS &&
 -            $oldsubmission->attemptnumber >= ($this->get_instance()->maxattempts - 1)) {
-+        if ($instance->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS &&
-+            $oldsubmission->attemptnumber >= ($instance->maxattempts - 1)) {
++        if (
++                $instance->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS &&
++                $oldsubmission->attemptnumber >= ($instance->maxattempts - 1)
++        ) {
              return false;
          }
  
@@ -290,7 +294,7 @@ index 8f5f7cf4901..48218ca2e25 100644
          // Ensure that at least one assign setting was changed.
          $changed = false;
 -        $keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit');
-+        $keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts');
++        $keys = ['duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts'];
          foreach ($keys as $key) {
              if (isset($data[$key]) && $data[$key] != $assigninstance->{$key}) {
                  $changed = true;
@@ -303,7 +307,7 @@ index 88f38217baf..69cf307dc41 100644
  
  // Merge assign defaults with data.
 -$keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit');
-+$keys = array('duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts');
++$keys = ['duedate', 'cutoffdate', 'allowsubmissionsfromdate', 'timelimit', 'maxattempts'];
  foreach ($keys as $key) {
      if (!isset($data->{$key}) || $reset) {
          $data->{$key} = $assigninstance->{$key};
@@ -335,7 +339,7 @@ index a438e7a9890..17f0f990fd7 100644
              'duedate' => 200,
 -            'cutoffdate' => 300
 +            'cutoffdate' => 300,
-+            'maxattempts' => 4
++            'maxattempts' => 4,
          ];
          $DB->insert_record('assign_overrides', $override);
  
@@ -407,10 +411,16 @@ diff --git a/mod/assign/tests/fixtures/testable_assign.php b/mod/assign/tests/fi
 index 3c6e4d2be75..d7057c5f3a2 100644
 --- a/mod/assign/tests/fixtures/testable_assign.php
 +++ b/mod/assign/tests/fixtures/testable_assign.php
-@@ -61,6 +61,10 @@ class mod_assign_testable_assign extends assign {
+@@ -61,6 +61,16 @@ class mod_assign_testable_assign extends assign {
          return parent::process_add_attempt($userid);
      }
  
++    /**
++     * Check whether the bulk grant attempt action should be available for the listed users.
++     *
++     * @param array $useridlist Array of userids visible in the grading table.
++     * @return bool
++     */
 +    public function testable_has_bulk_grant_attempt_available(array $useridlist): bool {
 +        return parent::has_bulk_grant_attempt_available($useridlist);
 +    }
