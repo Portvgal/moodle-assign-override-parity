@@ -628,7 +628,11 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
 +    private function create_graded_attempt(\stdClass $student, \stdClass $teacher, \assign $assign, int $attemptnumber): void {
 +        $this->add_submission($student, $assign, 'Submission text ' . $attemptnumber);
 +        $this->submit_for_grading($student, $assign);
-+        $this->mark_submission($teacher, $assign, $student, 50.0, [], $attemptnumber);
++
++        $this->setUser($teacher);
++        $data = new \stdClass();
++        $data->grade = '50.0';
++        $assign->testable_apply_grade_to_user($data, $student->id, $attemptnumber);
 +    }
 +
      /**
