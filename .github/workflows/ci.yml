@@ -1,0 +1,94 @@
+name: Patch validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: patch-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-patch:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Moodle 4.5 patch
+            patch: patches/assign-override-maxattempts.patch
+            moodle_ref: 803c3d897761713abe777271efcfaf466c94908e
+            php: '8.3'
+            expected_prefix: mod/assign/
+          - name: Moodle 5.2 patch
+            patch: patches/assign-override-maxattempts-moodle52.patch
+            moodle_ref: 3110ec001b47fcb8a0a341160e72294f32cc622c
+            php: '8.4'
+            expected_prefix: public/mod/assign/
+
+    steps:
+      - name: Check out patch repository
+        uses: actions/checkout@v6
+        with:
+          path: patch-repository
+
+      - name: Check out Moodle base
+        uses: actions/checkout@v6
+        with:
+          repository: moodle/moodle
+          ref: ${{ matrix.moodle_ref }}
+          path: moodle
+          fetch-depth: 1
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Apply and validate patch
+        env:
+          EXPECTED_PREFIX: ${{ matrix.expected_prefix }}
+          PATCH_FILE: ${{ matrix.patch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git -C moodle apply --check "../patch-repository/${PATCH_FILE}"
+          git -C moodle apply "../patch-repository/${PATCH_FILE}"
+          git -C moodle diff --check
+
+          while IFS= read -r file; do
+            case "${file}" in
+              "${EXPECTED_PREFIX}"*) ;;
+              *)
+                echo "Unexpected file outside ${EXPECTED_PREFIX}: ${file}" >&2
+                exit 1
+                ;;
+            esac
+          done < <(git -C moodle diff --name-only)
+
+          mapfile -t phpfiles < <(git -C moodle diff --name-only --diff-filter=ACM -- '*.php')
+          test "${#phpfiles[@]}" -gt 0
+          for file in "${phpfiles[@]}"; do
+            php -l "moodle/${file}"
+          done
+
+  required-checks:
+    name: Required checks
+    if: always()
+    needs:
+      - validate-patch
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Confirm required jobs passed
+        env:
+          VALIDATE_RESULT: ${{ needs.validate-patch.result }}
+        run: test "${VALIDATE_RESULT}" = success

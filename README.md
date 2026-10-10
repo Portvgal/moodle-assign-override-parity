@@ -1,5 +1,7 @@
 # Moodle Assignment Override Attempts Patch
 
+[![Patch validation](https://github.com/Portvgal/moodle-assign-override-parity/actions/workflows/ci.yml/badge.svg)](https://github.com/Portvgal/moodle-assign-override-parity/actions/workflows/ci.yml)
+
 This repository contains a patch for Moodle core `mod_assign` that adds `Allowed attempts` to Assignment user and group overrides.
 
 The active Tracker contribution targets current Moodle `main`. Patch files for Moodle
