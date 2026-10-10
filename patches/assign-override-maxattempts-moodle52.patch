@@ -1,7 +1,8 @@
 diff --git a/public/mod/assign/backup/moodle2/backup_assign_stepslib.php b/public/mod/assign/backup/moodle2/backup_assign_stepslib.php
+index b40677e163efcf3f4fe112818e3a06e6f5111002..3417edaf29505856e6c8e4f90c2af20f5071b8d9 100644
 --- a/public/mod/assign/backup/moodle2/backup_assign_stepslib.php
 +++ b/public/mod/assign/backup/moodle2/backup_assign_stepslib.php
-@@ -185,6 +185,7 @@ class backup_assign_activity_structure_step extends backup_activity_structure_st
+@@ -184,6 +184,7 @@ class backup_assign_activity_structure_step extends backup_activity_structure_st
              'duedate',
              'cutoffdate',
              'timelimit',
@@ -10,6 +11,7 @@ diff --git a/public/mod/assign/backup/moodle2/backup_assign_stepslib.php b/publi
              'reasonformat',
          ]);
 diff --git a/public/mod/assign/classes/privacy/provider.php b/public/mod/assign/classes/privacy/provider.php
+index 67bd9337147570386760406c2705d848a54fe1c7..90f67f663ba769fb0b162efbd74bbb8d1e6b39ed 100644
 --- a/public/mod/assign/classes/privacy/provider.php
 +++ b/public/mod/assign/classes/privacy/provider.php
 @@ -84,6 +84,7 @@ class provider implements
@@ -20,7 +22,7 @@ diff --git a/public/mod/assign/classes/privacy/provider.php b/public/mod/assign/
                  'reason' => 'privacy:metadata:assignoverrides:reason',
          ];
          $assignsubmission = [
-@@ -704,6 +705,10 @@ class provider implements
+@@ -702,6 +703,10 @@ class provider implements
              if (!empty($overrides->allowsubmissionsfromdate)) {
                  $data->allowsubmissionsfromdate = transform::datetime($overrides->allowsubmissionsfromdate);
              }
@@ -32,9 +34,10 @@ diff --git a/public/mod/assign/classes/privacy/provider.php b/public/mod/assign/
                  $format = $overrides->reasonformat ?? FORMAT_MOODLE;
                  $data->reason = format_text($overrides->reason, $format, ['context' => $context]);
 diff --git a/public/mod/assign/db/install.xml b/public/mod/assign/db/install.xml
+index 959f906ecf2dd03ee4df4a15994d5dc48071ef1a..811de2cdc408fee905d94d715916b88d049d2e75 100644
 --- a/public/mod/assign/db/install.xml
 +++ b/public/mod/assign/db/install.xml
-@@ -161,6 +161,7 @@
+@@ -162,6 +162,7 @@
          <FIELD NAME="duedate" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Time by which students must have completed their attempt.  Can be null, in which case the assign default is used."/>
          <FIELD NAME="cutoffdate" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Time by which students must have completed their attempt.  Can be null, in which case the assign default is used."/>
          <FIELD NAME="timelimit" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Time limit in seconds. Can be null, in which case the quiz default is used."/>
@@ -43,6 +46,7 @@ diff --git a/public/mod/assign/db/install.xml b/public/mod/assign/db/install.xml
          <FIELD NAME="reasonformat" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The internal format for the override reason."/>
        </FIELDS>
 diff --git a/public/mod/assign/db/upgrade.php b/public/mod/assign/db/upgrade.php
+index c11bd888317bace2b8adde156affe268344153cf..78eb9bb2efcc34b9c9f42666b94a6ade4869fe98 100644
 --- a/public/mod/assign/db/upgrade.php
 +++ b/public/mod/assign/db/upgrade.php
 @@ -242,5 +242,19 @@ function xmldb_assign_upgrade($oldversion) {
@@ -66,6 +70,7 @@ diff --git a/public/mod/assign/db/upgrade.php b/public/mod/assign/db/upgrade.php
      return true;
  }
 diff --git a/public/mod/assign/gradingtable.php b/public/mod/assign/gradingtable.php
+index f61752ef049d81bb2a6f23727c8a9248e5390509..44e2729e8e87451f0c5092602f30de8072493b92 100644
 --- a/public/mod/assign/gradingtable.php
 +++ b/public/mod/assign/gradingtable.php
 @@ -1422,11 +1422,13 @@ class assign_grading_table extends table_sql implements renderable {
@@ -103,6 +108,7 @@ diff --git a/public/mod/assign/gradingtable.php b/public/mod/assign/gradingtable
          if ($ismanual && $hassubmission && $notreopened && $hasattempts) {
              $urlparams = array('id' => $this->assignment->get_course_module()->id,
 diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
+index bd9babcd9fa5928c139a3b0a565fb657bd49cc9b..4a2de194ab8e7755e34f878de4bccabd7d76147d 100644
 --- a/public/mod/assign/locallib.php
 +++ b/public/mod/assign/locallib.php
 @@ -1039,7 +1039,7 @@ class assign {
@@ -114,8 +120,7 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
          foreach ($keys as $key) {
              if (isset($override->{$key})) {
                  $this->get_instance($userid)->{$key} = $override->{$key};
-@@ -1109,7 +1109,8 @@ class assign {
-         // return arrays containing keys for only the defined overrides. So we get the
+@@ -1107,6 +1107,7 @@ class assign {
          // desired behaviour as per the algorithm.
          return (object)array_merge(
              ['timelimit' => null, 'duedate' => null, 'cutoffdate' => null, 'allowsubmissionsfromdate' => null],
@@ -123,7 +128,7 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
              $getgroupoverride($userid),
              $getuseroverride($userid)
          );
-@@ -4945,10 +4946,7 @@ class assign {
+@@ -4944,10 +4945,7 @@ class assign {
              $jsparams['removesubmission'] = has_capability('mod/assign:editothersubmission', $this->context);
              $jsparams['extend'] = $this->get_instance()->duedate && has_capability('mod/assign:grantextension', $this->context);
  
@@ -135,14 +140,14 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
  
              $jsparams['pluginoperations'] = [];
              foreach ($this->get_feedback_plugins() as $plugin) {
-@@ -8592,27 +8593,31 @@ class assign {
+@@ -8589,27 +8587,31 @@ class assign {
          }
  
          // Do not show if we are editing a previous attempt.
-+        $this->update_effective_access($userid);
-+        $instance = $this->get_instance($userid);
 -        if (($attemptnumber == -1 || ($attemptnumber + 1) == count($this->get_all_submissions($userid))) &&
 -                ($this->get_instance()->maxattempts > 1 || $this->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)) {
++        $this->update_effective_access($userid);
++        $instance = $this->get_instance($userid);
 +        if (
 +                ($attemptnumber == -1 || ($attemptnumber + 1) == count($this->get_all_submissions($userid))) &&
 +                ($instance->maxattempts > 1 || $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)
@@ -174,7 +179,7 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
  
              if ($ismanual && (!$issubmission || $isunlimited || $islessthanmaxattempts)) {
                  $mform->addElement('selectyesno', 'addattempt', get_string('addattempt', 'assign'));
-@@ -9487,7 +9490,8 @@ class assign {
+@@ -9483,7 +9485,8 @@ class assign {
       * @return bool - true if another attempt was added.
       */
      protected function reopen_submission_if_required($userid, $submission, $addattempt) {
@@ -184,7 +189,7 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
          $maxattemptsreached = !empty($submission) &&
                                $submission->attemptnumber >= ($instance->maxattempts - 1) &&
                                $instance->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS;
-@@ -9724,6 +9728,29 @@ class assign {
+@@ -9741,6 +9744,29 @@ class assign {
          return $result;
      }
  
@@ -214,7 +219,7 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
      /**
       * Check for a sess key and then call add_attempt.
       *
-@@ -9765,13 +9769,15 @@ class assign {
+@@ -9761,13 +9787,15 @@ class assign {
       */
      protected function add_attempt($userid) {
          require_capability('mod/assign:grade', $this->context);
@@ -232,7 +237,7 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
              $oldsubmission = $this->get_group_submission($userid, 0, false);
          } else {
              $oldsubmission = $this->get_user_submission($userid, false);
-@@ -9781,13 +9787,15 @@ class assign {
+@@ -9778,13 +9806,15 @@ class assign {
          }
  
          // No more than max attempts allowed.
@@ -251,7 +256,7 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
              if (isset($this->mostrecentteamsubmission)) {
                  // Team submissions can end up in this function for each user (via save_grade). We don't want to create
                  // more than one attempt for the whole team.
-@@ -9815,7 +9821,7 @@ class assign {
+@@ -9812,7 +9842,7 @@ class assign {
              }
          }
  
@@ -261,9 +266,10 @@ diff --git a/public/mod/assign/locallib.php b/public/mod/assign/locallib.php
          if (isset($flags->locked) && $flags->locked) { // May not exist.
              $this->process_unlock_submission($userid);
 diff --git a/public/mod/assign/override_form.php b/public/mod/assign/override_form.php
+index 7805915017444e54910cf3b509ac229b02831329..d6fe5cefbda28ac3322d3b9e65f76ba603d5e025 100644
 --- a/public/mod/assign/override_form.php
 +++ b/public/mod/assign/override_form.php
-@@ -294,6 +294,14 @@ class assign_override_form extends moodleform {
+@@ -286,6 +286,14 @@ class assign_override_form extends moodleform {
              $mform->setDefault('timelimit', $assigninstance->timelimit);
          }
  
@@ -278,7 +284,7 @@ diff --git a/public/mod/assign/override_form.php b/public/mod/assign/override_fo
          // Reason for override.
          $editoroptions = [
              'maxfiles' => 0,
-@@ -395,7 +403,7 @@ class assign_override_form extends moodleform {
+@@ -389,7 +397,7 @@ class assign_override_form extends moodleform {
  
          // Ensure that at least one assign setting was changed.
          $changed = false;
@@ -288,6 +294,7 @@ diff --git a/public/mod/assign/override_form.php b/public/mod/assign/override_fo
              if (isset($data[$key]) && $data[$key] != $assigninstance->{$key}) {
                  $changed = true;
 diff --git a/public/mod/assign/overrideedit.php b/public/mod/assign/overrideedit.php
+index ceb3bfdb988055d8e6582f8a196379b98c20a10f..3739e36db602721e1c2008a016cfe55051b41128 100644
 --- a/public/mod/assign/overrideedit.php
 +++ b/public/mod/assign/overrideedit.php
 @@ -96,7 +96,7 @@ if ($overrideid) {
@@ -300,9 +307,10 @@ diff --git a/public/mod/assign/overrideedit.php b/public/mod/assign/overrideedit
      if (!isset($data->{$key}) || $reset) {
          $data->{$key} = $assigninstance->{$key};
 diff --git a/public/mod/assign/overrides.php b/public/mod/assign/overrides.php
+index 016d3325646fdb992a192e9b309a43fb0ed085d2..d4548e17dc46bbfb77a502c18d1a76b70580c699 100644
 --- a/public/mod/assign/overrides.php
 +++ b/public/mod/assign/overrides.php
-@@ -217,6 +217,13 @@ foreach ($overrides as $override) {
+@@ -219,6 +219,13 @@ foreach ($overrides as $override) {
          $values[] = $override->timelimit > 0 ? format_time($override->timelimit) : get_string('none', 'assign');
      }
  
@@ -317,9 +325,10 @@ diff --git a/public/mod/assign/overrides.php b/public/mod/assign/overrides.php
      if (isset($override->reason) && $override->reason !== '') {
          $formattedreason = format_text(
 diff --git a/public/mod/assign/tests/backup/restore_date_test.php b/public/mod/assign/tests/backup/restore_date_test.php
+index 61275f474c0acac9f7a1c455675455cce036ffb7..8fac8b0dc4e77bbd8bdc640534ae0dd0e7b3b1e1 100644
 --- a/public/mod/assign/tests/backup/restore_date_test.php
 +++ b/public/mod/assign/tests/backup/restore_date_test.php
-@@ -58,7 +58,8 @@ final class restore_date_test extends \restore_date_testcase {
+@@ -52,7 +52,8 @@ final class restore_date_test extends \restore_date_testcase {
              'sortorder' => 1,
              'allowsubmissionsfromdate' => 100,
              'duedate' => 200,
@@ -329,7 +338,7 @@ diff --git a/public/mod/assign/tests/backup/restore_date_test.php b/public/mod/a
          ];
          $DB->insert_record('assign_overrides', $override);
  
-@@ -82,6 +83,7 @@ final class restore_date_test extends \restore_date_testcase {
+@@ -77,6 +78,7 @@ final class restore_date_test extends \restore_date_testcase {
          $this->assertEquals($override->duedate + $diff, $newoverride->duedate);
          $this->assertEquals($override->cutoffdate + $diff, $newoverride->cutoffdate);
          $this->assertEquals($override->allowsubmissionsfromdate + $diff, $newoverride->allowsubmissionsfromdate);
@@ -338,9 +347,10 @@ diff --git a/public/mod/assign/tests/backup/restore_date_test.php b/public/mod/a
          // Assign grade time checks.
          $this->assertEquals($grade->timecreated, $newgrade->timecreated);
 diff --git a/public/mod/assign/tests/behat/assign_group_override.feature b/public/mod/assign/tests/behat/assign_group_override.feature
+index 5e225f542c8c5d940de6c052a1b17e1bbdb9c947..eb83f7f969939a4fe4c6d6d5699319915bc6fde2 100644
 --- a/public/mod/assign/tests/behat/assign_group_override.feature
 +++ b/public/mod/assign/tests/behat/assign_group_override.feature
-@@ -39,15 +39,20 @@ Feature: Assign group override
+@@ -40,15 +40,20 @@ Feature: Assign group override
      And I select "Group overrides" from the "jump" singleselect
      And I press "Add group override"
      And I set the following fields to these values:
@@ -365,6 +375,7 @@ diff --git a/public/mod/assign/tests/behat/assign_group_override.feature b/publi
      And I press "Continue"
      And I should not see "Group 1"
 diff --git a/public/mod/assign/tests/behat/assign_user_override.feature b/public/mod/assign/tests/behat/assign_user_override.feature
+index b081ee04bc9009f1ccfef890fc5c7edff768eadf..97dc3984365d9d43e6daca7d7dffb2b27c44c95a 100644
 --- a/public/mod/assign/tests/behat/assign_user_override.feature
 +++ b/public/mod/assign/tests/behat/assign_user_override.feature
 @@ -28,15 +28,20 @@ Feature: Assign user override
@@ -392,9 +403,10 @@ diff --git a/public/mod/assign/tests/behat/assign_user_override.feature b/public
      And I press "Continue"
      And I should not see "Sam1 Student1"
 diff --git a/public/mod/assign/tests/fixtures/testable_assign.php b/public/mod/assign/tests/fixtures/testable_assign.php
+index 9b3808b960990a4a03b818ba1b3b274742883b4d..32c6e2b8daed10774bf0912d381230d888935a6c 100644
 --- a/public/mod/assign/tests/fixtures/testable_assign.php
 +++ b/public/mod/assign/tests/fixtures/testable_assign.php
-@@ -61,6 +61,16 @@ class mod_assign_testable_assign extends assign {
+@@ -60,6 +60,16 @@ class mod_assign_testable_assign extends assign {
          return parent::process_add_attempt($userid);
      }
  
@@ -412,9 +424,10 @@ diff --git a/public/mod/assign/tests/fixtures/testable_assign.php b/public/mod/a
          // Ugly hack to get something into the method.
          global $_POST;
 diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests/locallib_test.php
+index 4f4aec5c55f0138aff023c7c0e066894adc7199a..5e9f8ee0a3f093102124e74e97ce8dea710dce89 100644
 --- a/public/mod/assign/tests/locallib_test.php
 +++ b/public/mod/assign/tests/locallib_test.php
-@@ -3066,6 +3066,219 @@ final class locallib_test extends \advanced_testcase {
+@@ -3024,6 +3024,223 @@ You can see it appended to your <a href="' . $assignurl .
          $this->assertEmpty($grades);
      }
  
@@ -638,7 +651,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
      /**
       * Test reopen behavior when in "Reopen until pass" mode.
       */
-@@ -4242,6 +4455,7 @@ final class locallib_test extends \advanced_testcase {
+@@ -4205,6 +4422,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 2,
                  'cutoffdate' => 3,
                  'timelimit' => null,
@@ -646,7 +659,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
                  'reason' => null,
                  'reasonformat' => 0,
              ],
-@@ -4255,6 +4469,7 @@ final class locallib_test extends \advanced_testcase {
+@@ -4218,6 +4436,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 6,
                  'cutoffdate' => 6,
                  'timelimit' => null,
@@ -654,7 +667,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
                  'reason' => null,
                  'reasonformat' => 0,
              ],
-@@ -4268,6 +4483,7 @@ final class locallib_test extends \advanced_testcase {
+@@ -4231,6 +4450,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 8,
                  'cutoffdate' => 9,
                  'timelimit' => null,
@@ -662,7 +675,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
                  'reason' => null,
                  'reasonformat' => 0,
              ],
-@@ -4294,6 +4510,7 @@ final class locallib_test extends \advanced_testcase {
+@@ -4257,6 +4477,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
          $this->assertNull($override->duedate);
          $this->assertNull($override->cutoffdate);
          $this->assertNull($override->allowsubmissionsfromdate);
@@ -671,6 +684,7 @@ diff --git a/public/mod/assign/tests/locallib_test.php b/public/mod/assign/tests
  
      /**
 diff --git a/public/mod/assign/version.php b/public/mod/assign/version.php
+index 3da564e1c2d61c7999c32cb3a3abf740c9907839..c7798fbe06d7b6f07e7fba192f79c96b8de84266 100644
 --- a/public/mod/assign/version.php
 +++ b/public/mod/assign/version.php
 @@ -25,5 +25,5 @@

@@ -2,12 +2,12 @@
 
 ## Supported Versions
 
-This repository contains patch files for Moodle Assignment overrides. Security fixes are considered for the patch versions currently maintained in this repository.
+This repository contains historical patch snapshots for Moodle Assignment overrides. Active development happens on the MDL-67322 Moodle contribution branch rather than in these snapshots.
 
 | Target Moodle version | Patch file | Supported |
 | --- | --- | --- |
-| Moodle 5.2.x | `patches/assign-override-maxattempts-moodle52.patch` | Yes |
-| Moodle 4.5.x | `patches/assign-override-maxattempts.patch` | Yes |
+| Moodle 5.2.x | `patches/assign-override-maxattempts-moodle52.patch` | Historical snapshot |
+| Moodle 4.5.x | `patches/assign-override-maxattempts.patch` | Historical snapshot |
 | Other Moodle versions | Not provided | No |
 
 ## Reporting a Vulnerability
@@ -29,7 +29,7 @@ I will aim to acknowledge valid reports within 7 days.
 
 ## Scope
 
-Reports are in scope when they relate to this repository's patch behaviour, including Assignment user or group overrides, allowed attempts, backup/restore handling, upgrade behaviour, privacy export handling, or permission-sensitive Assignment workflows.
+Reports are in scope when they relate to this repository's patch behaviour, including Assignment user or group overrides, allowed attempts, backup/restore handling, upgrade behaviour, privacy export handling, or permission-sensitive Assignment workflows. Historical snapshots do not receive compatibility updates for later Moodle changes.
 
 General Moodle core vulnerabilities should also be reported through Moodle's official security process, because this repository is not the upstream authority for Moodle core.
 

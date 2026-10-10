@@ -2,7 +2,8 @@
 
 This repository contains a patch for Moodle core `mod_assign` that adds `Allowed attempts` to Assignment user and group overrides.
 
-Patch files are provided for Moodle `MOODLE_405_STABLE` and Moodle 5.2 development/test checkouts.
+The active Tracker contribution targets current Moodle `main`. Patch files for Moodle
+`MOODLE_405_STABLE` and Moodle 5.2 are retained as historical references only.
 
 ## Author
 
@@ -11,7 +12,14 @@ Patch prepared and tested by
 @Portvgal [John Braz]
 ```
 
-## Patch Files
+## Tracker contribution
+
+Active development for MDL-67322 is maintained on the
+[Moodle contribution branch](https://github.com/Portvgal/moodle/tree/MDL-67322-assign-override-maxattempts).
+The files in this repository are historical patch snapshots and are not the current
+Tracker submission or its review evidence.
+
+## Historical patch files
 
 For Moodle 4.5:
 
@@ -25,7 +33,8 @@ For Moodle 5.2:
 patches/assign-override-maxattempts-moodle52.patch
 ```
 
-Apply the matching patch from the root of a Moodle checkout:
+These older patches are not resubmission evidence. To inspect one historically, apply the
+matching patch from the root of a corresponding Moodle checkout:
 
 ```bash
 git checkout -b test-assign-override-maxattempts
@@ -119,9 +128,17 @@ The student does not automatically receive the most generous value. They receive
 
 If a student needs a different result from their group, create a user override for that student. The user override is the clearest and safest way to handle individual special consideration cases.
 
-## Tested
+## Verification status
 
-Local testing on Moodle `4.5.11+` and Moodle `5.2.1+` included:
+The historical patch files parse normally with `git apply` and apply cleanly to the exact
+Moodle bases from which they were produced. They have not been rebased onto current supported
+Moodle branches and must not be used as acceptance evidence for the active Tracker contribution.
+
+## Historical patch testing (not Tracker branch evidence)
+
+Earlier records described the following testing on separate Moodle `4.5.11+` and
+`5.2.1+` installations. They did not record exact tested commits and cannot be used
+to certify the current Tracker branch or subsequently modified patch files:
 
 - Manual testing of Assignment user and group overrides.
 - Manual testing of the bulk `Allow another attempt` workflow after creating a group override.
@@ -134,7 +151,7 @@ Local testing on Moodle `4.5.11+` and Moodle `5.2.1+` included:
 - Behat group override add/edit/delete scenarios.
 - HTTP smoke checks for both local Moodle sites.
 
-Latest focused automated results:
+Previously recorded results, retained for historical context only:
 
 ```text
 Moodle 4.5.11+

@@ -1,5 +1,5 @@
 diff --git a/mod/assign/backup/moodle2/backup_assign_stepslib.php b/mod/assign/backup/moodle2/backup_assign_stepslib.php
-index be6b6dcea21..be86a7dc4b5 100644
+index be6b6dcea2192bcefe35db9d6f5e783fc273e2e8..be86a7dc4b52e01d84e5c01467a907567dab4caf 100644
 --- a/mod/assign/backup/moodle2/backup_assign_stepslib.php
 +++ b/mod/assign/backup/moodle2/backup_assign_stepslib.php
 @@ -141,7 +141,8 @@ class backup_assign_activity_structure_step extends backup_activity_structure_st
@@ -13,7 +13,7 @@ index be6b6dcea21..be86a7dc4b5 100644
          // Build the tree.
          $assign->add_child($userflags);
 diff --git a/mod/assign/classes/privacy/provider.php b/mod/assign/classes/privacy/provider.php
-index 8918fe1078b..646bedeb8bf 100644
+index 8918fe1078b10d4edf364f9a7d1ef49ab2ba18c5..646bedeb8bf223e08006cfae16330bc4dacc7971 100644
 --- a/mod/assign/classes/privacy/provider.php
 +++ b/mod/assign/classes/privacy/provider.php
 @@ -83,7 +83,8 @@ class provider implements
@@ -38,7 +38,7 @@ index 8918fe1078b..646bedeb8bf 100644
                  writer::with_context($context)->export_data([get_string('overrides', 'mod_assign')], $data);
              }
 diff --git a/mod/assign/db/install.xml b/mod/assign/db/install.xml
-index 8d18486e143..4794724ab67 100644
+index 8d18486e1435d4e081946fc05da932a743f17f25..4794724ab67400c119db9351120541ff84a4624c 100644
 --- a/mod/assign/db/install.xml
 +++ b/mod/assign/db/install.xml
 @@ -157,6 +157,7 @@
@@ -50,7 +50,7 @@ index 8d18486e143..4794724ab67 100644
        <KEYS>
          <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
 diff --git a/mod/assign/db/upgrade.php b/mod/assign/db/upgrade.php
-index b654574b795..c3db2a61196 100644
+index b654574b795c4c310c70907eaa28acc7895c5638..c3db2a611962fbd7d444bf3c9d1b6bed6fc1c53a 100644
 --- a/mod/assign/db/upgrade.php
 +++ b/mod/assign/db/upgrade.php
 @@ -112,5 +112,19 @@ function xmldb_assign_upgrade($oldversion) {
@@ -74,10 +74,10 @@ index b654574b795..c3db2a61196 100644
      return true;
  }
 diff --git a/mod/assign/gradingtable.php b/mod/assign/gradingtable.php
-index e1d97edb60f..38f076739fc 100644
+index cc69aa0691a1dfee82b34a26ce16178704718dc1..89dd85fd158687f7257ca6ae994a944a424cbc00 100644
 --- a/mod/assign/gradingtable.php
 +++ b/mod/assign/gradingtable.php
-@@ -1225,11 +1225,13 @@ class assign_grading_table extends table_sql implements renderable {
+@@ -1200,11 +1200,13 @@ class assign_grading_table extends table_sql implements renderable {
                  $menu->add(new action_menu_link_secondary($baseactionurl, null, $description));
              }
  
@@ -94,7 +94,7 @@ index e1d97edb60f..38f076739fc 100644
  
              if ($ismanual && $hassubmission && $notreopened && $hasattempts) {
                  // Allow another attempt action link.
-@@ -1551,11 +1553,13 @@ class assign_grading_table extends table_sql implements renderable {
+@@ -1526,11 +1528,13 @@ class assign_grading_table extends table_sql implements renderable {
              );
          }
  
@@ -112,10 +112,10 @@ index e1d97edb60f..38f076739fc 100644
          if ($ismanual && $hassubmission && $notreopened && $hasattempts) {
              $urlparams = array('id' => $this->assignment->get_course_module()->id,
 diff --git a/mod/assign/locallib.php b/mod/assign/locallib.php
-index 16508b28c98..a7933a9bcb1 100644
+index 46588ccbd1f29e616f79180b4bca9bcc3f1d952a..2228431ab8b02dcb8383b26cea108b1f005a0f8a 100644
 --- a/mod/assign/locallib.php
 +++ b/mod/assign/locallib.php
-@@ -998,7 +998,7 @@ class assign {
+@@ -993,7 +993,7 @@ class assign {
          $override = $this->override_exists($userid);
  
          // Merge with assign defaults.
@@ -124,8 +124,7 @@ index 16508b28c98..a7933a9bcb1 100644
          foreach ($keys as $key) {
              if (isset($override->{$key})) {
                  $this->get_instance($userid)->{$key} = $override->{$key};
-@@ -1065,7 +1065,8 @@ class assign {
-         // return arrays containing keys for only the defined overrides. So we get the
+@@ -1061,6 +1061,7 @@ class assign {
          // desired behaviour as per the algorithm.
          return (object)array_merge(
              ['timelimit' => null, 'duedate' => null, 'cutoffdate' => null, 'allowsubmissionsfromdate' => null],
@@ -133,7 +132,7 @@ index 16508b28c98..a7933a9bcb1 100644
              $getgroupoverride($userid),
              $getuseroverride($userid)
          );
-@@ -4679,10 +4680,7 @@ class assign {
+@@ -4631,10 +4632,7 @@ class assign {
              $jsparams['removesubmission'] = has_capability('mod/assign:editothersubmission', $this->context);
              $jsparams['extend'] = $this->get_instance()->duedate && has_capability('mod/assign:grantextension', $this->context);
  
@@ -145,14 +144,14 @@ index 16508b28c98..a7933a9bcb1 100644
  
              $jsparams['pluginoperations'] = [];
              foreach ($this->get_feedback_plugins() as $plugin) {
-@@ -8063,27 +8064,31 @@ class assign {
+@@ -7969,27 +7967,31 @@ class assign {
          }
  
          // Do not show if we are editing a previous attempt.
-+        $this->update_effective_access($userid);
-+        $instance = $this->get_instance($userid);
 -        if (($attemptnumber == -1 || ($attemptnumber + 1) == count($this->get_all_submissions($userid))) &&
 -                ($this->get_instance()->maxattempts > 1 || $this->get_instance()->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)) {
++        $this->update_effective_access($userid);
++        $instance = $this->get_instance($userid);
 +        if (
 +                ($attemptnumber == -1 || ($attemptnumber + 1) == count($this->get_all_submissions($userid))) &&
 +                ($instance->maxattempts > 1 || $instance->maxattempts == ASSIGN_UNLIMITED_ATTEMPTS)
@@ -184,7 +183,7 @@ index 16508b28c98..a7933a9bcb1 100644
  
              if ($ismanual && (!$issubmission || $isunlimited || $islessthanmaxattempts)) {
                  $mform->addElement('selectyesno', 'addattempt', get_string('addattempt', 'assign'));
-@@ -8797,7 +8800,8 @@ class assign {
+@@ -8672,7 +8674,8 @@ class assign {
       * @return bool - true if another attempt was added.
       */
      protected function reopen_submission_if_required($userid, $submission, $addattempt) {
@@ -194,7 +193,7 @@ index 16508b28c98..a7933a9bcb1 100644
          $maxattemptsreached = !empty($submission) &&
                                $submission->attemptnumber >= ($instance->maxattempts - 1) &&
                                $instance->maxattempts != ASSIGN_UNLIMITED_ATTEMPTS;
-@@ -9034,6 +9038,29 @@ class assign {
+@@ -8927,6 +8930,29 @@ class assign {
          return $result;
      }
  
@@ -224,7 +223,7 @@ index 16508b28c98..a7933a9bcb1 100644
      /**
       * Check for a sess key and then call add_attempt.
       *
-@@ -9075,13 +9079,15 @@ class assign {
+@@ -8947,13 +8973,15 @@ class assign {
       */
      protected function add_attempt($userid) {
          require_capability('mod/assign:grade', $this->context);
@@ -242,7 +241,7 @@ index 16508b28c98..a7933a9bcb1 100644
              $oldsubmission = $this->get_group_submission($userid, 0, false);
          } else {
              $oldsubmission = $this->get_user_submission($userid, false);
-@@ -9092,13 +9098,15 @@ class assign {
+@@ -8964,13 +8992,15 @@ class assign {
          }
  
          // No more than max attempts allowed.
@@ -261,7 +260,7 @@ index 16508b28c98..a7933a9bcb1 100644
              if (isset($this->mostrecentteamsubmission)) {
                  // Team submissions can end up in this function for each user (via save_grade). We don't want to create
                  // more than one attempt for the whole team.
-@@ -9126,7 +9132,7 @@ class assign {
+@@ -8998,7 +9028,7 @@ class assign {
              }
          }
  
@@ -271,7 +270,7 @@ index 16508b28c98..a7933a9bcb1 100644
          if (isset($flags->locked) && $flags->locked) { // May not exist.
              $this->process_unlock_submission($userid);
 diff --git a/mod/assign/override_form.php b/mod/assign/override_form.php
-index 8f5f7cf4901..48218ca2e25 100644
+index 8f5f7cf49019b36e6b329510918b85aac544ec03..c71e80f47afe7e2e4db4d06b57c816140fedff43 100644
 --- a/mod/assign/override_form.php
 +++ b/mod/assign/override_form.php
 @@ -270,6 +270,14 @@ class assign_override_form extends moodleform {
@@ -299,7 +298,7 @@ index 8f5f7cf4901..48218ca2e25 100644
              if (isset($data[$key]) && $data[$key] != $assigninstance->{$key}) {
                  $changed = true;
 diff --git a/mod/assign/overrideedit.php b/mod/assign/overrideedit.php
-index 88f38217baf..69cf307dc41 100644
+index 88f38217baf8dd1494eda4911c135cb70960e8e4..e311ebc6be641eb2d4d71ff570646e1babaf33f1 100644
 --- a/mod/assign/overrideedit.php
 +++ b/mod/assign/overrideedit.php
 @@ -96,7 +96,7 @@ if ($overrideid) {
@@ -312,7 +311,7 @@ index 88f38217baf..69cf307dc41 100644
      if (!isset($data->{$key}) || $reset) {
          $data->{$key} = $assigninstance->{$key};
 diff --git a/mod/assign/overrides.php b/mod/assign/overrides.php
-index e41efdb992c..b035531dd05 100644
+index e41efdb992cfadaf156a0c580b2fcd34a845a00d..b035531dd05f361166c97ac5b52e0fc7028ff154 100644
 --- a/mod/assign/overrides.php
 +++ b/mod/assign/overrides.php
 @@ -217,6 +217,13 @@ foreach ($overrides as $override) {
@@ -330,10 +329,10 @@ index e41efdb992c..b035531dd05 100644
      $iconstr = '';
  
 diff --git a/mod/assign/tests/backup/restore_date_test.php b/mod/assign/tests/backup/restore_date_test.php
-index a438e7a9890..17f0f990fd7 100644
+index 075e14143ba6577aa6315fa784d113e17a444543..f97d4f3a6bcb389aa2c457856368e4b3d422e0b6 100644
 --- a/mod/assign/tests/backup/restore_date_test.php
 +++ b/mod/assign/tests/backup/restore_date_test.php
-@@ -52,7 +52,8 @@ final class restore_date_test extends \restore_date_testcase {
+@@ -52,7 +52,8 @@ class restore_date_test extends \restore_date_testcase {
              'sortorder' => 1,
              'allowsubmissionsfromdate' => 100,
              'duedate' => 200,
@@ -343,7 +342,7 @@ index a438e7a9890..17f0f990fd7 100644
          ];
          $DB->insert_record('assign_overrides', $override);
  
-@@ -77,6 +78,7 @@ final class restore_date_test extends \restore_date_testcase {
+@@ -77,6 +78,7 @@ class restore_date_test extends \restore_date_testcase {
          $this->assertEquals($override->duedate + $diff, $newoverride->duedate);
          $this->assertEquals($override->cutoffdate + $diff, $newoverride->cutoffdate);
          $this->assertEquals($override->allowsubmissionsfromdate + $diff, $newoverride->allowsubmissionsfromdate);
@@ -352,7 +351,7 @@ index a438e7a9890..17f0f990fd7 100644
          // Assign grade time checks.
          $this->assertEquals($grade->timecreated, $newgrade->timecreated);
 diff --git a/mod/assign/tests/behat/assign_group_override.feature b/mod/assign/tests/behat/assign_group_override.feature
-index d165dc199f9..a781dc6bc79 100644
+index 9fe42080e4033742b8d986b3066b853d579c93f0..1238a9ca3412459348160cf0f92d4886e22eaa26 100644
 --- a/mod/assign/tests/behat/assign_group_override.feature
 +++ b/mod/assign/tests/behat/assign_group_override.feature
 @@ -39,15 +39,20 @@ Feature: Assign group override
@@ -380,7 +379,7 @@ index d165dc199f9..a781dc6bc79 100644
      And I press "Continue"
      And I should not see "Group 1"
 diff --git a/mod/assign/tests/behat/assign_user_override.feature b/mod/assign/tests/behat/assign_user_override.feature
-index 776fb557527..84a8ec89a23 100644
+index 3f53d0cfa3a009b771a048b1dbd088e6c735e9c5..70d11c6b3f023f72be838fb8aa48e17777bf6ccc 100644
 --- a/mod/assign/tests/behat/assign_user_override.feature
 +++ b/mod/assign/tests/behat/assign_user_override.feature
 @@ -28,15 +28,20 @@ Feature: Assign user override
@@ -408,10 +407,10 @@ index 776fb557527..84a8ec89a23 100644
      And I press "Continue"
      And I should not see "Sam1 Student1"
 diff --git a/mod/assign/tests/fixtures/testable_assign.php b/mod/assign/tests/fixtures/testable_assign.php
-index 3c6e4d2be75..d7057c5f3a2 100644
+index 214b4f13d4ab6ebc24eb1d7c86181c1d67d694f6..4cd05c897e9aa661cc18c5e0a1debe63cd0aec5c 100644
 --- a/mod/assign/tests/fixtures/testable_assign.php
 +++ b/mod/assign/tests/fixtures/testable_assign.php
-@@ -61,6 +61,16 @@ class mod_assign_testable_assign extends assign {
+@@ -60,6 +60,16 @@ class mod_assign_testable_assign extends assign {
          return parent::process_add_attempt($userid);
      }
  
@@ -429,10 +428,10 @@ index 3c6e4d2be75..d7057c5f3a2 100644
          // Ugly hack to get something into the method.
          global $_POST;
 diff --git a/mod/assign/tests/locallib_test.php b/mod/assign/tests/locallib_test.php
-index f0e1b8d7eba..b81cd5bb8f2 100644
+index 18c33186707fb7cc7c4a80dfb7b42c75029a4dca..aca5007bc3a769bef13a56d0a577ac904153a786 100644
 --- a/mod/assign/tests/locallib_test.php
 +++ b/mod/assign/tests/locallib_test.php
-@@ -2667,6 +2667,219 @@ final class locallib_test extends \advanced_testcase {
+@@ -2658,6 +2658,223 @@ final class locallib_test extends \advanced_testcase {
          $this->assertEmpty($grades);
      }
  
@@ -656,7 +655,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
      /**
       * Test reopen behavior when in "Reopen until pass" mode.
       */
-@@ -3851,6 +4064,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+@@ -3842,6 +4059,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 2,
                  'cutoffdate' => 3,
                  'timelimit' => null,
@@ -664,7 +663,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
              ],
              (object) [
                  // Override for group 2, lower priority (numerically higher sortorder).
-@@ -3862,6 +4076,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+@@ -3853,6 +4071,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 6,
                  'cutoffdate' => 6,
                  'timelimit' => null,
@@ -672,7 +671,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
              ],
              (object) [
                  // User override.
-@@ -3873,6 +4088,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+@@ -3864,6 +4083,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
                  'duedate' => 8,
                  'cutoffdate' => 9,
                  'timelimit' => null,
@@ -680,7 +679,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
              ],
          ];
  
-@@ -3897,6 +4113,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
+@@ -3888,6 +4108,7 @@ Anchor link 2:<a title=\"bananas\" href=\"../logo-240x60.gif\">Link text</a>
          $this->assertNull($override->duedate);
          $this->assertNull($override->cutoffdate);
          $this->assertNull($override->allowsubmissionsfromdate);
@@ -689,7 +688,7 @@ index f0e1b8d7eba..b81cd5bb8f2 100644
  
      /**
 diff --git a/mod/assign/version.php b/mod/assign/version.php
-index f3adfdf307a..8cdae5596ac 100644
+index f3adfdf307af42b1bc2f3e6be6a2d98d96b5e51c..8cdae5596acbd698dcf9c351c9cf21bbf113d3eb 100644
 --- a/mod/assign/version.php
 +++ b/mod/assign/version.php
 @@ -25,5 +25,5 @@
