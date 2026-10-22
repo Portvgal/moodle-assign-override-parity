@@ -1,159 +1,179 @@
-# Moodle Assignment Override Attempts Patch
+# Assignment override parity for allowed attempts
 
 [![Patch validation](https://github.com/Portvgal/moodle-assign-override-parity/actions/workflows/ci.yml/badge.svg)](https://github.com/Portvgal/moodle-assign-override-parity/actions/workflows/ci.yml)
 
-This repository contains a patch for Moodle core `mod_assign` that adds `Allowed attempts` to Assignment user and group overrides.
+Moodle Assignment currently defines **Allowed attempts** at activity level but does not let teachers vary that limit through user or group overrides. [MDL-67322](https://tracker.moodle.org/browse/MDL-67322) adds an optional `Allowed attempts` value to Assignment overrides so Moodle can calculate and enforce an effective limit for each student.
 
-The active Tracker contribution targets current Moodle `main`. Patch files for Moodle
-`MOODLE_405_STABLE` and Moodle 5.2 are retained as historical references only.
+> [!IMPORTANT]
+> The authoritative implementation is the [active Moodle contribution branch](https://github.com/Portvgal/moodle/tree/MDL-67322-assign-override-maxattempts), which targets Moodle `main`. The patch files in this repository are historical snapshots for Moodle 4.5 and 5.2; they are not the current Tracker submission or current review evidence.
 
-## Author
+**Contribution links:** [MDL-67322](https://tracker.moodle.org/browse/MDL-67322) · [active branch](https://github.com/Portvgal/moodle/tree/MDL-67322-assign-override-maxattempts) · [patch validation CI](https://github.com/Portvgal/moodle-assign-override-parity/actions/workflows/ci.yml) · [Moodle 4.5 patch](patches/assign-override-maxattempts.patch) · [Moodle 5.2 patch](patches/assign-override-maxattempts-moodle52.patch)
 
-Patch prepared and tested by 
-```text
-@Portvgal [John Braz]
+## Contents
+
+- [Before and after](#before-and-after)
+- [Implementation overview](#implementation-overview)
+- [How Moodle determines the effective limit](#how-moodle-determines-the-effective-limit)
+- [Interaction with attempt reopening](#interaction-with-attempt-reopening)
+- [Teacher workflows](#teacher-workflows)
+- [Verification status](#verification-status)
+- [Historical patch reference](#historical-patch-reference)
+
+## Before and after
+
+| | Before MDL-67322 | With MDL-67322 |
+|---|---|---|
+| Activity configuration | One `Allowed attempts` value applies to the assignment. | The activity value remains the default. |
+| User override | Cannot vary the attempt limit. | May define an individual total attempt limit. |
+| Group override | Cannot vary the attempt limit. | May define a total attempt limit for the selected group. |
+| Grading actions | Availability is based on the activity-wide limit. | Availability is based on each student's effective limit. |
+| Student result | Every student shares the same maximum. | A student can receive the activity default, a selected group value, or a user-specific value. |
+
+The override value is the **total number of attempts allowed**, not the number of extra attempts to add.
+
+For example, if the assignment allows 2 attempts and a user override allows 3, that student may make 3 attempts in total—not 5.
+
+## Implementation overview
+
+| Area | Implemented change |
+|---|---|
+| Database and upgrade | Adds nullable `maxattempts` to `assign_overrides`, including the Moodle upgrade step. A null value continues to inherit the activity setting; `-1` represents unlimited attempts. |
+| Override forms | Adds `Allowed attempts` to both user and group override forms. |
+| Effective access | Includes `maxattempts` when Moodle merges assignment defaults, applicable group overrides, and a user override. |
+| Grading interface | Calculates attempt-action availability from the affected student's effective settings. |
+| Individual reopening | Checks the effective limit before displaying or processing `Allow another attempt`. |
+| Bulk reopening | Makes the bulk action available when at least one listed student has a compatible effective manual-reopening configuration. The action still validates each student individually. |
+| Submission enforcement | Prevents Moodle from creating an attempt beyond the student's effective finite limit. |
+| Backup and restore | Includes the override value in Assignment backup and restore structures. |
+| Privacy | Includes the value when Assignment override data is exported through the privacy provider. |
+| Upgrade documentation | Records the new override field and its behaviour in Moodle's upgrade notes. |
+| Automated coverage | Adds focused PHPUnit and Behat coverage for user and group overrides, unlimited attempts, precedence, action visibility, persistence, and backup/restore behaviour. |
+
+## How Moodle determines the effective limit
+
+```mermaid
+flowchart TD
+    A["Assignment default<br/>Allowed attempts"] --> B{"Applicable group override?"}
+    B -- No --> D["Current effective limit"]
+    B -- Yes --> C["Use the group override selected<br/>by Moodle's override order"]
+    C --> D
+    D --> E{"User override present?"}
+    E -- No --> F["Final effective limit"]
+    E -- Yes --> G["User override replaces<br/>the inherited/group value"]
+    G --> F
+    F --> H{"Attempts reopened setting"}
+    H -- Manually --> I["Teacher uses<br/>Allow another attempt"]
+    H -- Automatically until pass --> J["Moodle's automatic<br/>reopen logic applies"]
+    H -- Never --> K["No reopen action"]
 ```
 
-## Tracker contribution
+| Situation | Effective result |
+|---|---|
+| No applicable override | Assignment `Allowed attempts` value |
+| One applicable group override | That group's value |
+| Several applicable group overrides | The group override selected by Moodle's override ordering |
+| User and group overrides both apply | User override |
+| Override leaves the value unset | Inherited value |
 
-Active development for MDL-67322 is maintained on the
-[Moodle contribution branch](https://github.com/Portvgal/moodle/tree/MDL-67322-assign-override-maxattempts).
-The files in this repository are historical patch snapshots and are not the current
-Tracker submission or its review evidence.
+Moodle does **not** automatically choose the most generous group value. If a student belongs to multiple overridden groups, the applicable value comes from the group override with the highest priority in the Group overrides list (the lowest sort order). A user override then takes precedence over the selected group value.
 
-## Historical patch files
+When a student needs a result different from their group, use a user override.
 
-For Moodle 4.5:
+## Interaction with attempt reopening
 
-```text
-patches/assign-override-maxattempts.patch
+Changing the maximum does not necessarily open another submission attempt. The `Attempts reopened` setting still controls how the next attempt is created.
+
+| Attempts reopened | Does the override change the limit? | Does raising the limit immediately open an attempt? |
+|---|---:|---:|
+| `Manually` | Yes | No. A teacher must use `Allow another attempt`. |
+| `Automatically until pass` | Yes | No immediate action. Moodle's normal automatic reopen logic decides when to create the attempt. |
+| `Never` | The effective limit can be resolved, but no reopening workflow uses it. | No. |
+
+```mermaid
+sequenceDiagram
+    participant T as Teacher
+    participant O as Assignment override
+    participant G as Grading page
+    participant S as Student
+    T->>O: Raise Allowed attempts
+    O-->>G: Effective limit is now higher
+    Note over O,G: With manual reopening, no attempt is created yet
+    T->>G: Select Allow another attempt
+    G-->>S: Newly opened attempt becomes available
 ```
 
-For Moodle 5.2:
+## Teacher workflows
 
-```text
-patches/assign-override-maxattempts-moodle52.patch
-```
+### Grant another attempt to one student
 
-These older patches are not resubmission evidence. To inspect one historically, apply the
-matching patch from the root of a corresponding Moodle checkout:
+**Prerequisites**
 
-```bash
-git checkout -b test-assign-override-maxattempts
-git apply /path/to/matching-assign-override-maxattempts.patch
-php admin/cli/upgrade.php
-php admin/cli/purge_caches.php
-```
+- The assignment uses `Attempts reopened: Manually`.
+- The student's effective `Allowed attempts` value is greater than their current attempt count.
+- `Allow submissions from`, due date, and cut-off date permit the intended submission.
 
-## What It Adds
+**Steps**
 
-Assignment overrides can now set `Allowed attempts`, matching the Assignment setting of the same name.
-
-The value means total attempts allowed, not extra attempts added.
-
-Example:
-
-```text
-Assignment allowed attempts: 2
-User override allowed attempts: 3
-Result: that user may have 3 total attempts.
-```
-
-## Using Override Attempts With Manual Reopening
-
-Override attempts work together with the Assignment `Attempts reopened` setting.
-
-If `Attempts reopened` is set to `Manually`, increasing the override does not automatically create a new attempt. The teacher still needs to go back to the student's submission or grading screen and choose `Allow another attempt`.
-
-Common trap:
-
-```text
-Assignment allowed attempts: 2
-Attempts reopened: Manually
-Student has submitted attempt 2
-Teacher grades attempt 2
-Teacher creates user override allowed attempts: 3
-```
-
-At this point the student still may not see a new attempt until the teacher explicitly allows another attempt. The override raises the limit; it does not reopen the submission by itself.
-
-### Single Student Workflow
-
-1. Confirm the Assignment `Attempts reopened` setting is `Manually`.
-2. Create a user or group override with a higher `Allowed attempts` value.
-3. Confirm the override dates still allow submission, especially the cut-off date.
+1. Create or edit the applicable user or group override.
+2. Set `Allowed attempts` to the required total.
+3. Check the override dates, especially the cut-off date.
 4. Return to the student's submission or grading page.
-5. Use `Allow another attempt`.
-6. The student can then submit the newly opened attempt.
-
-### Bulk Workflow For Several Students
-
-Use the bulk action only after the user or group override is already correct.
-
-1. Create the user or group override first, including `Allowed attempts`, due date, and cut-off date.
-2. Go to `View all submissions`.
-3. Select the affected students in the grading table.
-4. In the sticky footer toolbar, open `More`.
 5. Choose `Allow another attempt`.
 
-The bulk action only opens the next attempt for the selected students. It does not create an override and does not change `Allow submissions from`, due date, or cut-off date. If the cut-off date has already passed, update the user or group override dates before using the bulk action.
+**Expected result:** Moodle creates the next attempt and the student can submit it while the effective dates allow submission.
 
-If the bulk `Allow another attempt` action is not visible, check that:
+**If it fails:** Check that manual reopening is enabled, the current attempt has not already been reopened, the effective limit has not been exhausted, and the cut-off date has not passed.
 
-- `Attempts reopened` is set to `Manually`.
-- The selected students have an effective user or group override with `Allowed attempts` greater than the assignment default.
-- The updated patch has been applied and Moodle caches have been purged.
+### Grant another attempt to several students
 
-If `Attempts reopened` is `Automatically until pass` or another automatic mode, Moodle's normal reopen logic still controls when another attempt is created. The override only changes the maximum allowed attempt count used by that logic.
+**Prerequisites**
 
-## User And Group Override Priority
+- Create the relevant user or group overrides before using the bulk action.
+- The selected students have compatible effective limits and submission dates.
+- The assignment uses manual reopening.
 
-Assignment overrides can be created for individual users and for groups.
+**Steps**
 
-Normal UI behavior is:
+1. Open `View all submissions`.
+2. Select the affected students.
+3. Open `More` in the sticky footer toolbar.
+4. Choose `Allow another attempt`.
 
-- One user override per assignment per user.
-- One group override per assignment per group.
-- A user may be affected by several group overrides if they belong to several groups.
-- A user-specific override takes priority over group overrides.
-- If multiple group overrides apply, Assignment uses the group override with the highest priority in the Group overrides list. In practice, this is the group override with the lowest sort order.
+**Expected result:** Moodle opens the next attempt for eligible selected students. The bulk action does not create overrides or alter submission dates.
 
-Important implication:
-
-```text
-Group A override allowed attempts: 4
-Group B override allowed attempts: 5
-Student belongs to both groups
-```
-
-The student does not automatically receive the most generous value. They receive the value from the group override that Assignment selects by group override order.
-
-If a student needs a different result from their group, create a user override for that student. The user override is the clearest and safest way to handle individual special consideration cases.
+**If the action is missing or a student is skipped:** Confirm that the patch is applied, caches are purged, manual reopening is enabled, the student has an effective limit above the current attempt count, and the applicable cut-off date has not passed.
 
 ## Verification status
 
-The historical patch files parse normally with `git apply` and apply cleanly to the exact
-Moodle bases from which they were produced. They have not been rebased onto current supported
-Moodle branches and must not be used as acceptance evidence for the active Tracker contribution.
+### Current contribution
 
-## Historical patch testing (not Tracker branch evidence)
+The [active contribution branch](https://github.com/Portvgal/moodle/tree/MDL-67322-assign-override-maxattempts) is the source of truth for Tracker review. Evidence for that branch must be tied to its current commit and current Moodle `main` base; results recorded for the historical patches below do not transfer to it.
 
-Earlier records described the following testing on separate Moodle `4.5.11+` and
-`5.2.1+` installations. They did not record exact tested commits and cannot be used
-to certify the current Tracker branch or subsequently modified patch files:
+This repository's [Patch validation workflow](https://github.com/Portvgal/moodle-assign-override-parity/actions/workflows/ci.yml) checks the historical snapshots against the exact Moodle commits from which they were produced. It verifies:
 
-- Manual testing of Assignment user and group overrides.
-- Manual testing of the bulk `Allow another attempt` workflow after creating a group override.
-- Clean patch apply checks against fresh Moodle 4.5 and Moodle 5.2 worktrees.
-- Moodle upgrade and cache purge checks.
-- Schema/version checks confirming `assign_overrides.maxattempts` exists.
-- PHP syntax checks and whitespace checks for changed `mod_assign` files.
-- PHPUnit tests for user override attempts, group override attempts, unlimited attempts, bulk grant attempt visibility, override resolution, and backup restore.
-- Behat user override add/edit/delete scenarios.
-- Behat group override add/edit/delete scenarios.
-- HTTP smoke checks for both local Moodle sites.
+- clean `git apply --check` and patch application;
+- no whitespace errors in the resulting diff;
+- changes stay within the expected `mod/assign` path;
+- PHP syntax for changed PHP files.
 
-Previously recorded results, retained for historical context only:
+It does not run the current Tracker branch's PHPUnit, Behat, Moodle pre-check, or peer-review process.
+
+### Historical evidence summary
+
+Earlier records describe manual and automated checks for:
+
+- user and group override add, edit, and delete flows;
+- finite and unlimited effective attempt limits;
+- user/group precedence and group ordering;
+- individual and bulk `Allow another attempt` visibility;
+- schema upgrade and persistence;
+- backup and restore;
+- PHP syntax, whitespace, and HTTP smoke checks.
+
+Those records do not identify exact tested commits and cannot certify the active branch or later modifications. The full `mod_assign` PHPUnit suite and full Assignment Behat suite were not run.
+
+<details>
+<summary>Recorded historical test counts</summary>
 
 ```text
 Moodle 4.5.11+
@@ -170,4 +190,33 @@ Moodle 5.2.1+
 
 Unrelated third-party plugin schema warnings were ignored where they did not involve `mod_assign`.
 
-Residual risk: the full `mod_assign` PHPUnit suite and full Assignment Behat suite were not run.
+</details>
+
+## Historical patch reference
+
+The retained patches apply only to the matching historical Moodle bases:
+
+- [Moodle 4.5 snapshot](patches/assign-override-maxattempts.patch)
+- [Moodle 5.2 snapshot](patches/assign-override-maxattempts-moodle52.patch)
+
+They have not been rebased onto current supported Moodle branches and must not be used as acceptance or resubmission evidence for MDL-67322.
+
+<details>
+<summary>Apply a historical patch for inspection</summary>
+
+From the root of the matching Moodle checkout:
+
+```bash
+git checkout -b test-assign-override-maxattempts
+git apply /path/to/matching-assign-override-maxattempts.patch
+php admin/cli/upgrade.php
+php admin/cli/purge_caches.php
+```
+
+</details>
+
+## Author and licence
+
+Patch prepared and tested by [@Portvgal](https://github.com/Portvgal) (John Braz).
+
+This repository is distributed under the [GNU General Public License v3.0](LICENSE).
