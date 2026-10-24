@@ -18,6 +18,7 @@ jobs:
   validate-patch:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -35,20 +36,22 @@ jobs:
 
     steps:
       - name: Check out patch repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: patch-repository
+          persist-credentials: false
 
       - name: Check out Moodle base
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: moodle/moodle
           ref: ${{ matrix.moodle_ref }}
           path: moodle
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
           coverage: none
@@ -61,11 +64,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          git -C moodle apply --check "../patch-repository/${PATCH_FILE}"
+          git -C moodle apply --check --whitespace=error-all "../patch-repository/${PATCH_FILE}"
           git -C moodle apply "../patch-repository/${PATCH_FILE}"
           git -C moodle diff --check
 
-          while IFS= read -r file; do
+          mapfile -t changedfiles < <(git -C moodle diff --name-only)
+          test "${#changedfiles[@]}" -gt 0
+
+          for file in "${changedfiles[@]}"; do
             case "${file}" in
               "${EXPECTED_PREFIX}"*) ;;
               *)
@@ -73,12 +79,22 @@ jobs:
                 exit 1
                 ;;
             esac
-          done < <(git -C moodle diff --name-only)
+          done
 
           mapfile -t phpfiles < <(git -C moodle diff --name-only --diff-filter=ACM -- '*.php')
           test "${#phpfiles[@]}" -gt 0
           for file in "${phpfiles[@]}"; do
             php -l "moodle/${file}"
+          done
+
+          mapfile -t xmlfiles < <(git -C moodle diff --name-only --diff-filter=ACM -- '*.xml')
+          for file in "${xmlfiles[@]}"; do
+            php -r '
+              $document = new DOMDocument();
+              if (!$document->load($argv[1])) {
+                  exit(1);
+              }
+            ' "moodle/${file}"
           done
 
   required-checks:
@@ -87,6 +103,7 @@ jobs:
     needs:
       - validate-patch
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Confirm required jobs passed
         env:
